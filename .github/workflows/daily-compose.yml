@@ -1,0 +1,47 @@
+name: daily compose
+
+on:
+  schedule:
+    # 21:00 UTC == 06:00 KST (the next morning).
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "YYYY-MM-DD or 'today' (KST)"
+        type: string
+        default: "today"
+      city:
+        description: "city id"
+        type: string
+        default: "seoul"
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mido verovio requests
+
+      - name: Compose & upload
+        env:
+          KMA_SERVICE_KEY: ${{ secrets.KMA_SERVICE_KEY }}
+          SUPABASE_URL:    ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_STORAGE_BUCKET:   busy-day-archive
+        run: |
+          DATE="${{ github.event.inputs.date || 'today' }}"
+          CITY="${{ github.event.inputs.city || 'seoul' }}"
+          python -m compose daily --date "$DATE" --city "$CITY"

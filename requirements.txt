@@ -1,8 +1,4 @@
-# busy-day composer (phase 1)
+# busy-day composer
 mido>=1.3.0
-
-# phase 2 (audio + score) — install when needed
-# music21>=9.1
-# midi2audio>=0.1.1            # requires fluidsynth (apt: fluidsynth)
-# pillow>=10.0                 # post-process verovio output
-# verovio>=4.3                 # MusicXML -> SVG (or use the CLI binary)
+verovio>=4.3        # IR -> ABC -> SVG (no system deps)
+requests>=2.31      # KMA + Supabase REST

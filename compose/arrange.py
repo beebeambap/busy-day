@@ -28,8 +28,12 @@ from .scales import chord_pitches, degree_to_midi
 
 
 def _section_lengths(genre: str, bpm: int, bpb: float,
-                     target_sec: float = 62.0) -> dict[str, int]:
-    """Distribute ~target_sec of total music across the 5 sections."""
+                     target_sec: float = 60.0) -> dict[str, int]:
+    """Distribute ~target_sec of total music across the 5 sections.
+
+    The actual rendered length lands within roughly ±5s of target_sec
+    because we force a tonic OUTRO that may absorb slightly more time.
+    """
     target_bars = max(8, round(target_sec * bpm / 60.0 / bpb))
 
     # base proportions sum to 1.0
@@ -40,6 +44,9 @@ def _section_lengths(genre: str, bpm: int, bpb: float,
         prop = {"INTRO": 0.08, "A": 0.42, "B": 0.18, "A_PRIME": 0.24, "OUTRO": 0.08}
 
     raw = {k: max(1, round(target_bars * v)) for k, v in prop.items()}
+    # OUTRO needs >=2 bars so the tonic can actually breathe
+    if raw["OUTRO"] < 2:
+        raw["OUTRO"] = 2
     # reconcile rounding so the sum equals target_bars exactly
     diff = target_bars - sum(raw.values())
     if diff != 0:
@@ -66,6 +73,7 @@ def compose_ir(
     rng: Random,
     features: Features,
     spec: dict,
+    target_sec: float = 60.0,
 ) -> dict:
     bpm = spec["bpm"]
     mode = spec["mode"]
@@ -75,7 +83,7 @@ def compose_ir(
     motif = spec["motif"]
     bpb = _beats_per_bar(meter)
 
-    sec_len = _section_lengths(genre, bpm, bpb)
+    sec_len = _section_lengths(genre, bpm, bpb, target_sec=target_sec)
     form = ["INTRO", "A", "B", "A_PRIME", "OUTRO"]
     total_bars = sum(sec_len[s] for s in form)
 
@@ -105,16 +113,21 @@ def compose_ir(
     harmony_events = []
     bass_events = []
 
+    last_bar_idx = len(chord_seq) - 1
     cur_bar = 0
+    ring_out_beats = 0.0  # extra ring for the closing chord
     for bar_idx, (chord_root, mel_notes, meta) in enumerate(
         zip(chord_seq, melody_bars, bars_meta)
     ):
         section = meta["section"]
-        # ── melody (skip in INTRO half the time, sparse in OUTRO) ─────
+        is_final = bar_idx == last_bar_idx
+
+        # ── melody: skip on the very first INTRO bar and the very last
+        #          OUTRO bar so the piece breathes in and out
         play_melody = True
         if section == "INTRO" and bar_idx == 0:
             play_melody = False
-        if section == "OUTRO" and bar_idx == len(chord_seq) - 1:
+        if is_final:
             play_melody = False
 
         if play_melody:
@@ -123,40 +136,60 @@ def compose_ir(
                 pitch = degree_to_midi(key, mode, deg, octave_shift=oct_shift,
                                        base_octave=5)
                 if 36 <= pitch <= 96:
+                    vel = 70 + int(rng.uniform(-6, 6))
+                    if section == "OUTRO":
+                        vel = max(40, vel - 12)
                     melody_events.append({
                         "bar": cur_bar,
                         "start_beat": round(t, 4),
                         "pitch": pitch,
                         "dur_beats": round(dur, 4),
-                        "vel": 70 + int(rng.uniform(-6, 6)),
+                        "vel": vel,
                     })
                 t += dur
 
-        # ── harmony (pad chord) ──────────────────────────────────────
-        pitches = chord_pitches(key, mode, chord_root, voicing=voicing,
+        # ── harmony pad. Final bar is forced to tonic and rings out. ──
+        chord_for_harmony = 1 if is_final else chord_root
+        pitches = chord_pitches(key, mode, chord_for_harmony, voicing=voicing,
                                 base_octave=3)
+        if is_final:
+            ring_out_beats = bpb * 1.0  # one extra bar of decay
+            har_dur = bpb + ring_out_beats
+            har_vel = 42
+        else:
+            har_dur = bpb
+            har_vel = 50 + int(rng.uniform(-4, 4))
         harmony_events.append({
             "bar": cur_bar,
             "start_beat": 0.0,
             "pitches": pitches,
-            "dur_beats": bpb,
-            "vel": 50 + int(rng.uniform(-4, 4)),
+            "dur_beats": har_dur,
+            "vel": har_vel,
         })
 
-        # ── bass: root-pedal, with a 5th passing on beat 3 in 4/4 ────
-        bass_root = degree_to_midi(key, mode, chord_root, octave_shift=-1,
-                                   base_octave=2)
-        bass_events.append({
-            "bar": cur_bar, "start_beat": 0.0,
-            "pitch": bass_root, "dur_beats": bpb / 2, "vel": 60,
-        })
-        if bpb >= 4:
-            fifth = degree_to_midi(key, mode, chord_root + 4,
+        # ── bass: root-pedal, with a 5th passing on beat 3 in 4/4. The
+        #         final tonic bar plays a single sustained root.
+        bass_root = degree_to_midi(key, mode, chord_for_harmony,
                                    octave_shift=-1, base_octave=2)
+        if is_final:
             bass_events.append({
-                "bar": cur_bar, "start_beat": bpb / 2,
-                "pitch": fifth, "dur_beats": bpb / 2, "vel": 58,
+                "bar": cur_bar, "start_beat": 0.0,
+                "pitch": bass_root,
+                "dur_beats": bpb + ring_out_beats,
+                "vel": 50,
             })
+        else:
+            bass_events.append({
+                "bar": cur_bar, "start_beat": 0.0,
+                "pitch": bass_root, "dur_beats": bpb / 2, "vel": 60,
+            })
+            if bpb >= 4:
+                fifth = degree_to_midi(key, mode, chord_root + 4,
+                                       octave_shift=-1, base_octave=2)
+                bass_events.append({
+                    "bar": cur_bar, "start_beat": bpb / 2,
+                    "pitch": fifth, "dur_beats": bpb / 2, "vel": 58,
+                })
 
         cur_bar += 1
 
@@ -172,7 +205,7 @@ def compose_ir(
         else degree_to_midi(key, mode, 1, base_octave=5)
     )
 
-    duration_beats = total_bars * bpb
+    duration_beats = total_bars * bpb + ring_out_beats
     duration_sec = duration_beats * 60.0 / bpm
 
     return {
@@ -181,6 +214,7 @@ def compose_ir(
             "city_id": city_id,
             "seed": seed,
             "generator_ver": GENERATOR_VER,
+            "target_sec": target_sec,
         },
         "spec": {
             "key_root": key,
@@ -202,9 +236,9 @@ def compose_ir(
         },
         "signature": signature,
         "start_pitch": _pitch_class_name(start_pitch_midi),
-        "duration_short_sec": int(round(duration_sec)),
-        "duration_long_sec": int(round(duration_sec * 2.2)),
+        "ring_out_beats": ring_out_beats,
         "total_bars": total_bars,
+        "duration_sec": round(duration_sec, 2),
     }
 
 

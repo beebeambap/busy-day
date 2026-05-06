@@ -272,7 +272,36 @@ main {
 }
 .variant-toggle button:last-child { border-right: none; }
 .variant-toggle button.active { background: var(--fg); color: var(--bg); }
-audio { width: 100%; }
+.transport {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  align-items: center;
+  gap: 0.75rem;
+}
+.transport .play {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  font-size: 14px;
+  padding: 0;
+  background: var(--bg);
+}
+.transport .play:disabled { opacity: 0.4; cursor: progress; }
+.transport progress {
+  width: 100%;
+  height: 3px;
+  appearance: none;
+  border: none;
+  background: var(--line);
+}
+.transport progress::-webkit-progress-bar { background: var(--line); }
+.transport progress::-webkit-progress-value { background: var(--fg); }
+.transport progress::-moz-progress-bar { background: var(--fg); }
+.transport span { font-size: 12px; font-variant-numeric: tabular-nums; }
+.small { font-size: 12px; }
+
+.score-svg { width: 100%; overflow-x: auto; }
+.score-svg svg { width: 100%; height: auto; display: block; }
 
 .weather {
   display: grid;

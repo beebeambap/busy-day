@@ -237,20 +237,79 @@ python -m compose generate --date 2026-05-06 --city seoul \
 검증: 7일치 생성 결과 모두 모드/조성/장르/BPM/박자/모티브/시그니처 유니크,
 ~60초 길이 안정.
 
-### Phase 2 — 오디오 + 악보 렌더 (미착수)
+### Phase 2 — 브라우저 재생 + 악보 (완료)
 
-1. `music21` 로 IR → MusicXML
-2. Verovio CLI 로 MusicXML → SVG → PNG → JPG (Pillow)
-3. FluidSynth + 사운드폰트로 MIDI → WAV (1분, 2분+ 두 길이)
-4. ffmpeg 으로 WAV → MP3
-5. 결과물: ir.json, musicxml, score.jpg, audio_short.mp3, audio_long.mp3,
-   audio_short.wav, audio_long.wav, audio.mid
+작곡 본체에 **자연 종결** 추가: 마지막 마디는 강제 토닉 + 한 마디 분량
+잔향(ring-out) — 끊어지지 않고 자연스럽게 사라진다.
 
-### Phase 3 — KMA 실연동 + Supabase 업로드/DB insert
+같은 spec(키/모드/장르/BPM/박자/모티브)으로 **short(~60s)** 와
+**long(~130s)** 두 IR을 동시 생성. long은 short의 자연스러운 확장 (다른
+곡이 아님).
 
-### Phase 4 — GitHub Actions cron
+```
+python -m compose generate --date 2026-05-06 --city seoul \
+    --preset seoul-mild-clear --out out/test
+# -> out/test/{ir_short.json, ir_long.json,
+#              audio_short.mid, audio_long.mid, score.svg}
+```
 
-### Phase 5 — Edge Function 수동 트리거 + 웹 UI 버튼
+오디오 렌더는 **서버 측이 아닌 브라우저**:
+- `js/player.js`가 [@tonejs/midi](https://tonejs.github.io/) 로 MIDI 파싱
+- Tone.js Sampler + Salamander 그랜드 피아노 (CDN, ~6MB 1회 캐시)
+- 멜로디는 피아노, 화성은 부드러운 AM 패드 + 리버브
+- 결과: 서버 렌더 0초, mp3 파일 0개, 사용자 다운로드는 MIDI/SVG 직접
+
+악보는 `compose/score.py`가 IR → ABC → verovio → SVG.
+브라우저는 fetch 후 inline 삽입(확대 자유, 인쇄 가능).
+
+### Phase 3 — KMA 실연동 + Supabase 업로드 (완료)
+
+`compose/kma.py`:
+- 단기예보 `getVilageFcst` 호출, 페이지네이션 처리
+- KMA 강수 표기("강수없음", "1mm 미만", "30.0~50.0mm" 등) 모두 흡수
+- 결과를 일 단위 평균/합계로 집계 → temp_c/temp_range/humidity/precip_mm/wind_mps/cloud_pct/precip_type
+
+`compose/upload.py`:
+- service-role key 로 Storage PUT + REST upsert
+- 절대 브라우저에 노출되지 않음 (cron 환경변수에만 있음)
+
+`compose/daily.py` end-to-end:
+1. cities 행에서 `kma_nx, kma_ny` 조회
+2. 최근 30일 songs 행에서 signature/motif/genre 회수 → 회피 리스트 구성
+3. 시그니처 충돌 시 최대 3회 재시도
+4. weekly_theme upsert (FK 충족용) → 곡 생성 → 자산 5종 업로드 → songs upsert
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… KMA_SERVICE_KEY=… \
+  python -m compose daily --date today --city seoul
+```
+
+### Phase 4 — GitHub Actions cron (완료)
+
+`.github/workflows/daily-compose.yml`:
+- `cron: "0 21 * * *"` (UTC) = **매일 06:00 KST** (다음 날 아침)
+- `workflow_dispatch` 로 수동 실행도 동일 동작
+- 의존성 = `mido + verovio + requests` (사운드폰트 다운로드 0)
+
+#### 필수 GitHub Secrets
+
+리포 Settings → Secrets and variables → Actions → New secret:
+
+| 이름 | 값 | 출처 |
+|---|---|---|
+| `SUPABASE_URL` | `https://diqxldieduslrpkjrguc.supabase.co` | 이 문서 |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ…` (긴 JWT) | Supabase Dashboard → Project Settings → API → service_role secret |
+| `KMA_SERVICE_KEY` | `xxxxxxxx==` | data.go.kr → 마이페이지 → 단기예보 조회 서비스 일반 인증키(Encoded) |
+
+세 개를 등록한 뒤 Actions 탭 → daily compose → Run workflow 로 즉시 호출 가능.
+그 이후로는 매일 06:00 KST 자동 실행.
+
+### Phase 5 — Edge Function 수동 트리거 (미착수)
+
+웹 UI "오늘 곡 만들기" 버튼 → Supabase Edge Function `/trigger` →
+`workflow_dispatch` GitHub API → 위 워크플로 실행 → 폴링으로 결과 표시.
+
+GH Actions 가 자동/수동 모두 정상 동작하는 게 확인되면 다음 페이즈로 진행.
 
 ---
 

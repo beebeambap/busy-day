@@ -56,7 +56,7 @@
       </header>
 
       <figure class="score">
-        <img id="detail-score" alt="악보" hidden>
+        <div id="detail-score" class="score-svg" hidden></div>
         <p id="detail-score-empty" class="empty muted">악보 준비 중</p>
       </figure>
 
@@ -65,7 +65,12 @@
           <button data-variant="short" class="active">1분</button>
           <button data-variant="long">2분+</button>
         </div>
-        <audio id="detail-audio" controls preload="none"></audio>
+        <div class="transport">
+          <button id="play-btn" type="button" class="play" disabled>▶</button>
+          <progress id="play-progress" max="100" value="0"></progress>
+          <span id="play-time" class="muted">0:00 / 0:00</span>
+        </div>
+        <p id="player-status" class="muted small">피아노 샘플 로딩 중…</p>
       </div>
 
       <dl id="detail-weather" class="weather"></dl>
