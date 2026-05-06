@@ -21,6 +21,12 @@ import json
 from random import Random
 
 from . import GENERATOR_VER
+from .comping import (
+    bass_pattern,
+    bass_pitch as _bass_pitch,
+    chord_subset,
+    harmony_pattern,
+)
 from .features import Features
 from .harmony import progression, voicing_for_genre
 from .humanize import (
@@ -154,30 +160,41 @@ def compose_ir(
                     })
                 t += dur
 
-        # ── harmony pad. Final bar is forced to tonic and rings out. ──
+        # ── harmony comping (rhythmic left hand). Final bar is forced
+        #    to tonic + sustained ring-out so the piece breathes shut.
         chord_for_harmony = 1 if is_final else chord_root
-        pitches = chord_pitches(key, mode, chord_for_harmony, voicing=voicing,
-                                base_octave=3)
+        full_chord = chord_pitches(key, mode, chord_for_harmony,
+                                   voicing=voicing, base_octave=3)
         if is_final:
-            ring_out_beats = bpb * 1.0  # one extra bar of decay
-            har_dur = bpb + ring_out_beats
-            har_vel = 42
+            ring_out_beats = bpb * 1.0
+            harmony_events.append({
+                "bar": cur_bar,
+                "start_beat": 0.0,
+                "pitches": full_chord,
+                "dur_beats": bpb + ring_out_beats,
+                "vel": 42,
+            })
         else:
-            har_dur = bpb
-            har_vel = 50 + int(rng.uniform(-4, 4))
-        harmony_events.append({
-            "bar": cur_bar,
-            "start_beat": 0.0,
-            "pitches": pitches,
-            "dur_beats": har_dur,
-            "vel": har_vel,
-        })
+            har_base_vel = 56 + int(rng.uniform(-3, 3))
+            for off, dur, kind, vel_mult in harmony_pattern(genre, meter):
+                pitches = chord_subset(full_chord, kind)
+                if not pitches:
+                    continue
+                vel = max(28, min(96,
+                          int(round(har_base_vel * vel_mult
+                                    + rng.uniform(-2, 2)))))
+                harmony_events.append({
+                    "bar": cur_bar,
+                    "start_beat": round(off, 4),
+                    "pitches": pitches,
+                    "dur_beats": round(dur, 4),
+                    "vel": vel,
+                })
 
-        # ── bass: root-pedal, with a 5th passing on beat 3 in 4/4. The
-        #         final tonic bar plays a single sustained root.
-        bass_root = degree_to_midi(key, mode, chord_for_harmony,
-                                   octave_shift=-1, base_octave=2)
+        # ── bass walking. Final bar = sustained root.
         if is_final:
+            bass_root = degree_to_midi(key, mode, chord_for_harmony,
+                                       octave_shift=-1, base_octave=2)
             bass_events.append({
                 "bar": cur_bar, "start_beat": 0.0,
                 "pitch": bass_root,
@@ -185,16 +202,23 @@ def compose_ir(
                 "vel": 50,
             })
         else:
-            bass_events.append({
-                "bar": cur_bar, "start_beat": 0.0,
-                "pitch": bass_root, "dur_beats": bpb / 2, "vel": 60,
-            })
-            if bpb >= 4:
-                fifth = degree_to_midi(key, mode, chord_root + 4,
-                                       octave_shift=-1, base_octave=2)
+            for off, dur, kind in bass_pattern(genre, meter):
+                pitch = _bass_pitch(degree_to_midi, key, mode,
+                                    chord_root, kind)
+                if not (24 <= pitch <= 60):
+                    continue
+                vel = 58 + int(rng.uniform(-3, 3))
+                # accent the downbeat; alberti upper notes softer
+                if off == 0.0:
+                    vel += 4
+                if kind == "fifth_up":
+                    vel -= 6
                 bass_events.append({
-                    "bar": cur_bar, "start_beat": bpb / 2,
-                    "pitch": fifth, "dur_beats": bpb / 2, "vel": 58,
+                    "bar": cur_bar,
+                    "start_beat": round(off, 4),
+                    "pitch": pitch,
+                    "dur_beats": round(dur, 4),
+                    "vel": max(30, min(85, vel)),
                 })
 
         cur_bar += 1

@@ -31,6 +31,8 @@ html, body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  /* prevent any rogue child from causing horizontal scroll on phones */
+  overflow-x: hidden;
 }
 
 body[data-state="loading"] main,
@@ -470,3 +472,101 @@ main {
   letter-spacing: 0.04em;
 }
 .downloads a:hover { background: #f1ede5; }
+
+/* ── mobile (≤ 600px) ──────────────────────────────────────── */
+@media (max-width: 600px) {
+  html, body { font-size: 14px; }
+
+  main {
+    padding: 1.25rem 0.75rem 4.5rem;
+  }
+  .topbar {
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .brand    { font-size: 18px; letter-spacing: 0.03em; }
+  .meta     { font-size: 11px; }
+
+  .monthnav {
+    gap: 0.5rem;
+    margin: 0.5rem 0 1rem;
+  }
+  .monthnav h2 {
+    font-size: 15px;
+    min-width: auto;
+  }
+  .monthnav button {
+    font-size: 18px;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .weekrow.head { font-size: 10px; }
+  .weekrow.head span { padding: 0.4rem 0; }
+
+  .cell { padding: 0.3rem 0.35rem; }
+  .cell .num   { font-size: 12px; }
+  .cell .genre {
+    font-size: 9px;
+    padding-right: 1.3rem;
+  }
+  .cell .count {
+    top: 3px;
+    right: 4px;
+    font-size: 9px;
+  }
+
+  .legend  { margin-top: 1rem; font-size: 11px; }
+
+  .make-row { margin-top: 1.25rem; }
+  .make-row .make {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 13px;
+  }
+
+  /* ── modals: take almost the whole screen ── */
+  .detail-inner {
+    width: 96vw;
+    max-height: 94vh;
+    padding: 1.25rem 1rem 1.5rem;
+  }
+  .detail-head h3 { font-size: 19px; }
+  .detail-head p  { font-size: 12px; }
+  .score          { padding: 0.5rem; min-height: 120px; }
+  .score-svg svg  { min-width: unset; }
+  audio           { width: 100%; }
+
+  .intent-inner {
+    width: 96vw;
+    max-height: 94vh;
+    overflow-y: auto;
+    padding: 1.25rem 1rem 1.25rem;
+  }
+  .intent-inner h3 { font-size: 16px; }
+  .intents,
+  .intents.instruments {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.45rem;
+  }
+  .intents button {
+    padding: 0.55rem 0.4rem;
+    font-size: 12px;
+  }
+  .intents button .icon { font-size: 15px; }
+  .intents button .sub  { font-size: 9px; }
+
+  .modal-actions .primary {
+    width: 100%;
+    padding: 0.7rem;
+  }
+
+  /* variant chips wrap nicely */
+  .variant-chips { gap: 0.3rem; }
+  .variant-chips button {
+    font-size: 10px;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .downloads { gap: 0.35rem; }
+  .downloads a { font-size: 11px; padding: 0.3rem 0.6rem; }
+}
