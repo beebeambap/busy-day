@@ -1,5 +1,9 @@
 /* busy day — minimal Muji-leaning aesthetic */
 
+/* Author display rules below override the UA's `hidden` rule, so make
+   the HTML `hidden` attribute authoritative again. */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #faf8f4;
   --fg: #1a1a1a;
