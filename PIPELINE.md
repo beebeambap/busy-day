@@ -1,0 +1,220 @@
+# busy-day — 동작 로직 & 비용 노트
+
+`DESIGN.md` 의 보조 문서. (1) Supabase 무료/유료 경계, (2) KMA 호출→작곡 파이프라인,
+(3) AI 가 어디에 들어가고/안 들어가는지를 운영 관점에서 정리.
+
+---
+
+## 1. Supabase 무료 한도와 유료 전환 시점
+
+(2026년 5월 기준 Supabase 공개 요금제 — 정확한 수치는 변동 가능, 신청 직전에
+대시보드 재확인 필요)
+
+### 1.1 Free Plan 핵심 한도
+
+| 항목 | Free 한도 | busy-day 1 도시·1년 환산 |
+|---|---|---|
+| Postgres DB 용량 | **500 MB** | songs 365행 + plays 수만 행 → 수십 MB. 여유 |
+| 월간 활성 사용자(MAU, Auth) | **50,000** | 매장 BGM 용도면 충분 |
+| Storage 용량 | **1 GB** | mp3 5MB × 365 = **1.78 GB** → **1년 못 채움. 6개월쯤 초과** |
+| Storage 월 송신(egress) | **5 GB / 월** | 동시 청취 매우 적으면 OK, 공개 배포는 빠르게 초과 |
+| Edge Functions 호출 | **500K / 월** | 일 1만 회까지 안전 |
+| DB egress | **5 GB / 월** | 메타 응답만이면 충분 |
+| 프로젝트 비활성화 | **7일 무접속 시 일시정지** | 매일 cron 이 돌면 발생 X |
+| 동시 Free 프로젝트 수 | 보통 **2개** | 현재 INACTIVE 2개 보유, 활성 1개 |
+
+### 1.2 무료로 갈 수 있는 최대 기간 (도시 1개·서울 단일 기준)
+
+병목은 **DB 용량이 아니라 Storage 1 GB**.
+- mp3(영구) 5MB/일 + score.jpg 0.6MB/일 + ir/musicxml/midi ≈ 0.1MB/일 → **약 5.7MB/일**
+- 1024MB / 5.7MB ≈ **약 180일 (≈ 6개월)** → 그 이후 **유료(Pro)** 또는 외부 스토리지 분리 필요
+- mp3 비트레이트를 V5(~130k) 로 낮추면 ~3.5MB/일 → **약 290일 (≈ 9.5개월)**
+
+**Egress(송신)** 가 실질 병목이 될 가능성이 더 큼:
+- mp3 1곡 5MB · 사용자 100명·하루 1회 청취 = **15 GB/월** → 하루 100청취만 돼도 **첫 달부터 5 GB 초과**
+- 즉 **베타로 친구 10명에게만 공유** 단계까지가 무료, 공개 배포 즉시 유료 영역.
+
+### 1.3 유료 전환이 발생하는 트리거
+
+다음 중 **하나라도 닿으면 그 달부터 비용 발생**:
+
+1. Storage 누적 용량 **1 GB 초과** (대략 운영 6개월차)
+2. Storage egress 월 **5 GB 초과** (공개 트래픽 시작 첫 달)
+3. DB 용량 **500 MB 초과** (waveform.json·plays 폭증 시 1~2년차)
+4. MAU **50,000 초과** (대중적 인기를 얻은 시점)
+5. Auth add-on (소셜 로그인 무제한 등) 활성화 시
+6. Edge Functions 호출 **500K/월 초과**
+
+### 1.4 Pro Plan 전환 시 비용 구조
+
+- **고정 $25 / 월** (조직 단위, 프로젝트 수 무관)
+- 포함: DB 8 GB, Storage 100 GB, Egress 250 GB/월, MAU 100K
+- 초과분: Storage $0.021/GB·월, Egress $0.09/GB, DB $0.125/GB·월 정도
+- 즉 **Pro 진입 후 대부분의 트래픽은 정액 안에서 흡수**, 진짜 변동비는 egress 가
+  250 GB/월 넘어갈 때부터
+
+### 1.5 권장 운영 전략 (비용 최소화)
+
+a. **MVP/베타(0~6개월)**: Free 그대로 사용. 도시 1개, 사용자 < 50명
+b. **Storage 분리 시점(6개월~)**: mp3·jpg 같은 큰 정적 자산만 **Cloudflare R2**(egress 무료)로
+   이전, Supabase 는 DB + 메타만. 이 구성이면 Free 를 1~2년까지 연장 가능
+c. **공개 배포 시점**: Supabase Pro($25) + R2(스토리지·egress 거의 무료) 조합이
+   가장 가성비
+d. **수면 모드**: 단일 도시 운영 중에도 cron 이 매일 한 번 호출되어
+   "7일 비활성 자동 정지" 는 발생 X — 그래도 백업용 cron 별도 권장
+
+### 1.6 우리 환경에서의 즉시 결정사항
+- 활성 Free 프로젝트가 이미 1개(`workout_schedule`) 있음 → busy-day 는 두 번째 활성
+  슬롯에 들어감(통상 Free 2개 가능)
+- 또는 INACTIVE 2개 중 하나(`workout` / `roi-assessment`) 를 해제하고 신규 생성
+- 권장: **`busy-day` 라는 이름으로 신규 Free 프로젝트 생성** (기존과 스키마 분리)
+
+---
+
+## 2. KMA 날씨 API → 작곡 파이프라인
+
+기상청(KMA) 단기예보/실황 API 를 일 단위로 호출해 그날의 IR 과 자산을 만든다.
+
+### 2.1 호출하는 KMA 엔드포인트
+
+| 용도 | 엔드포인트 | 호출 주기 |
+|---|---|---|
+| 초단기실황 | `/VilageFcstInfoService_2.0/getUltraSrtNcst` | (옵션) 실시간 위젯용 |
+| 단기예보(3일) | `/VilageFcstInfoService_2.0/getVilageFcst` | **매일 03:00 1회 (메인)** |
+| 중기육상예보 | `/MidFcstInfoService/getMidLandFcst` | (옵션) 월간 합본용 |
+
+KMA 좌표계는 LCC(격자) — 도시별로 `(nx, ny)` 룩업 테이블을 미리 둠
+(서울 = 60, 127). 인증키는 환경변수 `KMA_SERVICE_KEY`.
+
+### 2.2 단일 곡 생성 시퀀스 (배치, 매일 03:00)
+
+```
+[ 0 ] cron: city ∈ active_cities 마다 enqueue
+        │
+        ▼
+[ 1 ] fetch_kma(nx, ny, base_date=today, base_time=0200)
+        │  → JSON: TMP, REH, PCP, WSD, SKY, PTY ... 시간별 24개
+        ▼
+[ 2 ] aggregate_daily(rows)
+        │  → temp_c=mean, temp_range=max-min, humidity=mean,
+        │     precip_mm=sum, wind_mps=mean, cloud_pct=mean(SKY),
+        │     precip_type=mode(PTY)
+        ▼
+[ 3 ] extract_features(weather)
+        │  → warmth, brightness, wetness, calmness ∈ [0,1]
+        ▼
+[ 4 ] make_seed(date, city_id, generator_ver)
+        │  → deterministic int64
+        ▼
+[ 5 ] mapping.pick_mode/pick_bpm/pick_meter/pick_palette
+        │  → key='D', mode='dorian', bpm=72, palette={L1,L2,L3,L4}
+        ▼
+[ 6 ] compose.harmony  (Markov on mode chord pool)
+[ 7 ] compose.melody   (motif + variation, chord-tone biased)
+[ 8 ] compose.bass     (root-pedal + 5th passing)
+[ 9 ] compose.texture  (rain/room layer rules)
+        │
+        ▼
+[10 ] arrangement.compose(form=[INTRO,A,B,A',OUTRO])
+        │  → IR (in-memory)
+        ▼
+[11 ] humanize(IR, rng)
+        │
+        ▼
+[12 ] quality_check(IR)  ── fail ──► seed 재생성, [5]로 (max 5회)
+        │ pass
+        ▼
+[13 ] render:
+        ├─ to_midi(IR)        → audio.mid
+        ├─ to_musicxml(IR)    → score.musicxml
+        ├─ verovio → svg → png → jpg → score.jpg
+        └─ fluidsynth + pedalboard → wav → ffmpeg → audio.mp3
+        │
+        ▼
+[14 ] upload to Supabase Storage:
+        songs/{city}/{YYYY}/{MM}/{date}/{ir.json,musicxml,jpg,mp3,wav,mid,meta.json}
+        │
+        ▼
+[15 ] insert into public.songs (paths jsonb, weather jsonb, features jsonb, ...)
+```
+
+### 2.3 실패/재시도
+
+- KMA API 5xx → 지수 백오프 4회 → 그래도 실패 시 **전일 날씨 + noise** 로 폴백
+  플래그 `weather.fallback=true` 기록
+- 렌더 실패 → IR 만 저장하고 audio 는 null. 다음 cron 에서 재시도
+- 품질검사 5회 연속 실패 → 시드를 `+ generator_ver hash` 로 흔들고 재시도
+
+### 2.4 사용자 청취 시 흐름 (실시간)
+
+```
+브라우저 달력 진입
+  → GET /api/calendar?city=seoul&month=2026-05    (Supabase REST/Postgrest)
+  → 한 달치 메타 + score-thumb 받음
+  → 셀 클릭
+      → GET signed URL { musicxml, mp3, ir.json }   (Supabase Storage)
+      → OSMD 가 musicxml 렌더 (악보 표시)
+      → Tone.js 가 IR 또는 mp3 재생
+  → JPG / MP3 다운로드 버튼 = 같은 signed URL 직링크
+```
+
+여기서는 KMA 호출도, AI 호출도 없음 — **순수 정적 자산 서빙**.
+
+---
+
+## 3. AI 가 호출되는 지점 / 호출되지 않는 지점
+
+핵심 입장: **곡 생성 자체는 AI 가 아닌 규칙(rule) + 의사난수(seeded RNG)**.
+이유 — 재현성("같은 날 같은 도시 = 같은 곡"), 검증성, 비용 0, 라이선스 깨끗.
+
+### 3.1 AI 호출 없음 (기본 파이프라인)
+
+위 §2.2 의 **[1]–[14] 전 구간에 LLM/생성형 모델 호출 없음**.
+- 모드 선택: 결정 트리 (lookup table)
+- 화성 진행: 마르코프 체인 (사전 정의 가중치 행렬)
+- 멜로디: 모티브 변주 알고리즘 (역행/축소/이조)
+- 렌더: FluidSynth + 정적 이펙트 체인
+
+→ 곡 1개 생성 비용 = CPU 수 초 + 스토리지 약간. **API 호출비 0원**.
+
+### 3.2 선택적 AI 사용 지점 (옵션, 토글 가능)
+
+다음은 **옵션 기능**으로만 두고, 기본은 OFF. 켜면 비용·라이선스 검토 필요.
+
+| 위치 | 무엇을 | 모델 후보 | 켜야 하는 이유 |
+|---|---|---|---|
+| (a) 곡 제목/설명문 생성 | 그날의 날씨와 코드 진행을 받아 한 줄 시(詩) 생성 | Claude Haiku 4.5 | 매일 다른 카피, 무드 강화 |
+| (b) 멜로디 후보 리랭킹 | 룰로 N=8 후보 생성 → 모델이 "Muji스러움" 점수 매김 | Claude (텍스트로 음표 시퀀스 평가) | 품질 회귀 테스트 보강 |
+| (c) 화성 변형 가지치기 | 마르코프 후보들 중 자연스러운 것 픽 | 가벼운 분류기(자체 학습) | 룰 한계 보완 |
+| (d) 사용자 피드백 학습 | 좋아요 데이터로 모드/템포 가중치 재학습 | 자체(scikit-learn 수준) | v1.1+ 개인화 |
+| (e) 음성 안내(설명) | "오늘은 흐린 D Dorian, 비가 가끔" | TTS(별도) | 접근성 |
+
+권장 순서: **(a) → (e) → (b)**. (b) 부터는 "재현성" 약속이 흔들리므로
+generator_ver 를 별도로 기록.
+
+### 3.3 비용 모델 비교
+
+| 구성 | 곡당 비용 | 일/도시 | 1년/100도시 |
+|---|---|---|---|
+| 규칙 only (기본) | $0 | $0 | $0 + 인프라 |
+| (a) 제목 생성 ON (Haiku 4.5, ~300토큰) | ≈ $0.0005 | $0.05 | ~$18 |
+| (b) 리랭킹 ON (Sonnet 4.6, ~3K 토큰) | ≈ $0.012 | $1.2 | ~$430 |
+
+→ 텍스트 메타데이터에만 AI 를 쓰면 거의 무시 가능, 음악 본체에 AI 를 쓰면 1년에
+수백 달러 단위로 빠르게 증가.
+
+### 3.4 결정
+
+**v1.0 까지: AI 호출 0개로 운영.**
+**v1.1: (a) 곡 제목/설명문에만 Claude Haiku 4.5 사용.**
+**v1.2 이후: (b)/(d) 는 사용자 피드백이 수백 건 쌓인 뒤 검토.**
+
+---
+
+## 4. 다음 액션
+
+1. Supabase 신규 Free 프로젝트 `busy-day` 생성 결정 → 확정 시 `apply_migration`
+   으로 `supabase/migrations/20260506000001_init_songs.sql` 실행
+2. Storage 버킷 `busy-day-archive` (public read) 생성
+3. `seoul` 도시 row 1개 시드(insert)
+4. KMA 어댑터 + cron(Edge Function `/daily-compose`) 작성
