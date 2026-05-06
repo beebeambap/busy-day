@@ -87,6 +87,7 @@ def _city_grid(sb: Supabase, city_id: str) -> tuple[int, int]:
 
 def cmd_daily(args: argparse.Namespace) -> int:
     from .intent import get as get_intent
+    from .instruments import get as get_instrument
 
     sb = Supabase()
     motifs_path = os.path.join(os.path.dirname(__file__), "data", "motifs.json")
@@ -101,6 +102,8 @@ def cmd_daily(args: argparse.Namespace) -> int:
     variant_id = (args.variant or "auto").strip() or "auto"
     intent = get_intent(args.intent)
     intent_id = intent.id if intent else None
+    instrument = get_instrument(args.instrument)
+    instrument_id = instrument.id if instrument else None
 
     nx, ny = _city_grid(sb, city)
 
@@ -140,6 +143,11 @@ def cmd_daily(args: argparse.Namespace) -> int:
 
     _ensure_weekly_theme(sb, iso_week_key, ir_short["spec"]["genre"])
 
+    # Stamp instrument override onto IR so render_midi picks it up
+    if instrument is not None:
+        ir_short["melody_gm_program"] = instrument.gm_program
+        ir_long["melody_gm_program"]  = instrument.gm_program
+
     # 5. render
     with tempfile.TemporaryDirectory() as tmp:
         ir_short_path  = os.path.join(tmp, "ir_short.json")
@@ -178,6 +186,7 @@ def cmd_daily(args: argparse.Namespace) -> int:
         "date":               date_iso,
         "variant_id":         variant_id,
         "intent_id":          intent_id,
+        "instrument_id":      instrument_id,
         "seed":               ir_short["meta"]["seed"],
         "key_root":           spec["key_root"],
         "mode":               spec["mode"],
@@ -228,4 +237,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--intent",
                    help="intent preset id (calm/warm/wistful/lively/"
                         "after_rain/sleep)")
+    p.add_argument("--instrument",
+                   help="melody instrument id (piano/rhodes/nylon/strings/"
+                        "music_box/horn). Default: genre decides.")
     p.set_defaults(func=cmd_daily)

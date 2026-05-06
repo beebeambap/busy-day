@@ -10,9 +10,19 @@ const INTENTS = [
   { id: "calm",       label: "차분하게",   sub: "조용한 무드" },
   { id: "warm",       label: "따뜻하게",   sub: "포근한 톤" },
   { id: "wistful",    label: "쓸쓸하게",   sub: "단조 기울임" },
-  { id: "lively",     label: "활기차게",   sub: "보사·포크 쪽" },
+  { id: "lively",     label: "활기차게",   sub: "빠른 BPM" },
   { id: "after_rain", label: "비 온 뒤처럼", sub: "촉촉한 잔향" },
   { id: "sleep",      label: "잠들기 전",   sub: "느린 BPM" },
+];
+
+const INSTRUMENTS = [
+  { id: "",          label: "자동",          icon: "·",  sub: "장르 기본" },
+  { id: "piano",     label: "피아노",        icon: "🎹", sub: "그랜드" },
+  { id: "rhodes",    label: "일렉피아노",    icon: "🎹", sub: "Rhodes" },
+  { id: "nylon",     label: "나일론 기타",   icon: "🎸", sub: "어쿠스틱" },
+  { id: "strings",   label: "현악기",        icon: "🎻", sub: "스트링즈" },
+  { id: "music_box", label: "음악 상자",     icon: "🔔", sub: "셀레스타" },
+  { id: "horn",      label: "호른",          icon: "📯", sub: "프렌치 혼" },
 ];
 
 function todayKST() {
@@ -31,25 +41,59 @@ async function pollForVariant(city, dateIso, variantId, etaSec) {
   throw new Error("timeout");
 }
 
-function makeIntentModal({ onPick }) {
-  const root = $("intent");
-  const grid = $("intent-grid");
-  const status = $("intent-status");
-  const closeBtn = $("intent-close");
+function makeIntentModal({ onSubmit }) {
+  const root      = $("intent");
+  const intentEl  = $("intent-grid");
+  const instEl    = $("instrument-grid");
+  const submitBtn = $("intent-submit");
+  const status    = $("intent-status");
+  const closeBtn  = $("intent-close");
 
-  function render() {
-    grid.innerHTML = "";
-    for (const i of INTENTS) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.dataset.intentId = i.id;
-      b.innerHTML = `${i.label}<span class="sub">${i.sub}</span>`;
-      b.addEventListener("click", () => onPick(i.id, b));
-      grid.appendChild(b);
+  let pickedIntent = null;
+  let pickedInstrument = "";   // "" = auto
+
+  function paintActive(container, value) {
+    for (const b of container.querySelectorAll("button")) {
+      b.classList.toggle("active", b.dataset.value === value);
     }
   }
 
+  function render() {
+    intentEl.innerHTML = "";
+    for (const i of INTENTS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.value = i.id;
+      b.innerHTML = `${i.label}<span class="sub">${i.sub}</span>`;
+      b.addEventListener("click", () => {
+        pickedIntent = i.id;
+        paintActive(intentEl, i.id);
+        submitBtn.disabled = false;
+      });
+      intentEl.appendChild(b);
+    }
+    instEl.innerHTML = "";
+    for (const i of INSTRUMENTS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.value = i.id;
+      b.innerHTML =
+        `<span class="icon">${i.icon}</span>${i.label}` +
+        `<span class="sub">${i.sub}</span>`;
+      if (i.id === pickedInstrument) b.classList.add("active");
+      b.addEventListener("click", () => {
+        pickedInstrument = i.id;
+        paintActive(instEl, i.id);
+      });
+      instEl.appendChild(b);
+    }
+    paintActive(intentEl, pickedIntent);
+    submitBtn.disabled = !pickedIntent;
+  }
+
   function open() {
+    pickedIntent = null;
+    pickedInstrument = "";
     render();
     status.hidden = true;
     status.textContent = "";
@@ -65,8 +109,15 @@ function makeIntentModal({ onPick }) {
     status.textContent = msg || "";
   }
   function disableAll(disabled) {
-    for (const b of grid.querySelectorAll("button")) b.disabled = disabled;
+    for (const b of root.querySelectorAll("button:not(#intent-close)")) {
+      b.disabled = disabled;
+    }
   }
+
+  submitBtn.addEventListener("click", () => {
+    if (!pickedIntent) return;
+    onSubmit({ intent_id: pickedIntent, instrument_id: pickedInstrument || null });
+  });
 
   closeBtn.addEventListener("click", close);
   root.addEventListener("click", (e) => {
@@ -93,15 +144,16 @@ function boot() {
   });
 
   const intentModal = makeIntentModal({
-    onPick: async (intentId, btn) => {
+    onSubmit: async ({ intent_id, instrument_id }) => {
       intentModal.disableAll(true);
       intentModal.setStatus("워크플로 호출 중…");
       const dateIso = todayKST();
       try {
         const r = await triggerCompose({
-          city:      DEFAULT_CITY,
-          date:      dateIso,
-          intent_id: intentId,
+          city:          DEFAULT_CITY,
+          date:          dateIso,
+          intent_id,
+          instrument_id,
         });
         intentModal.setStatus(
           `곡을 빚는 중… (약 ${r.eta_sec || 90}초)`

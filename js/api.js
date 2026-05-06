@@ -18,9 +18,9 @@ export function publicUrl(path) {
 }
 
 const SONG_COLS =
-  "id, city_id, date, variant_id, intent_id, key_root, mode, genre, " +
-  "bpm, meter, duration_short_sec, duration_long_sec, weather, paths, " +
-  "created_at";
+  "id, city_id, date, variant_id, intent_id, instrument_id, " +
+  "key_root, mode, genre, bpm, meter, duration_short_sec, " +
+  "duration_long_sec, weather, paths, created_at";
 
 // Order so 'auto' shows first, then user variants by created_at desc.
 function _sortVariants(rows) {
@@ -80,7 +80,7 @@ export async function findVariant(cityId, dateIso, variantId) {
   return (data && data[0]) || null;
 }
 
-export async function triggerCompose({ city, date, intent_id }) {
+export async function triggerCompose({ city, date, intent_id, instrument_id }) {
   const url = `${SUPABASE_URL}/functions/v1/trigger`;
   const r = await fetch(url, {
     method: "POST",
@@ -89,13 +89,13 @@ export async function triggerCompose({ city, date, intent_id }) {
       "apikey":         SUPABASE_PUBLISHABLE_KEY,
       "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ city, date, intent_id }),
+    body: JSON.stringify({ city, date, intent_id, instrument_id }),
   });
   const text = await r.text();
   let body;
   try { body = JSON.parse(text); } catch { body = { error: text }; }
   if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
-  return body;          // { variant_id, intent_id, eta_sec, ... }
+  return body;          // { variant_id, intent_id, instrument_id, eta_sec, ... }
 }
 
 export async function recordPlay(songId, variant) {

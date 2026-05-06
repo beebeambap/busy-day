@@ -68,6 +68,69 @@ function makeNylon(volume) {
   });
 }
 
+function makeStrings(volume) {
+  // Bowed-string approximation — slow attack, sustained body
+  return new Tone.PolySynth(Tone.AMSynth, {
+    harmonicity: 1,
+    oscillator: { type: "sawtooth4" },
+    envelope:   { attack: 0.5, decay: 0.3, sustain: 0.85, release: 1.6 },
+    modulation: { type: "sine" },
+    modulationEnvelope: {
+      attack: 0.4, decay: 0.2, sustain: 0.7, release: 1.0,
+    },
+    volume,
+  });
+}
+
+function makeMusicBox(volume) {
+  // FM bell — short attack, fast decay, bright partials
+  return new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity: 6,
+    modulationIndex: 8,
+    oscillator: { type: "sine" },
+    envelope:   { attack: 0.005, decay: 0.45, sustain: 0.0, release: 1.6 },
+    modulation: { type: "sine" },
+    modulationEnvelope: {
+      attack: 0.005, decay: 0.55, sustain: 0.0, release: 0.6,
+    },
+    volume,
+  });
+}
+
+function makeHorn(volume) {
+  // Soft brass — gentle attack, full mid-range body
+  return new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity: 1,
+    modulationIndex: 3,
+    oscillator: { type: "sine" },
+    envelope:   { attack: 0.18, decay: 0.4, sustain: 0.75, release: 0.9 },
+    modulation: { type: "triangle" },
+    modulationEnvelope: {
+      attack: 0.22, decay: 0.4, sustain: 0.6, release: 0.5 },
+    volume,
+  });
+}
+
+// instrument_id (user override) -> factory(reverbBus) returning the
+// melody synth already routed to the bus. Returning null = no override,
+// fall back to the genre-derived melody.
+const INSTRUMENT_FACTORIES = {
+  piano: (reverb) => makePiano(2.4, -4).connect(reverb),
+  rhodes: (reverb) => {
+    const r = makeRhodes(-10);
+    r.connect(reverb);
+    return r;
+  },
+  nylon: (reverb) => {
+    const n = makeNylon(-8);
+    n.connect(reverb);
+    return n;
+  },
+  strings:   (reverb) => makeStrings(-12).connect(reverb),
+  music_box: (reverb) => makeMusicBox(-10).connect(reverb),
+  horn:      (reverb) => makeHorn(-12).connect(reverb),
+};
+
 function makeUprightBass(volume) {
   return new Tone.PolySynth(Tone.FMSynth, {
     harmonicity:    1.0,
@@ -106,9 +169,9 @@ function makeStringPad(volume) {
   });
 }
 
-const _instruments = new Map(); // genre -> { melody, harmony, bass, ready }
+const _instruments = new Map(); // cache key -> { melody, harmony, bass, ready }
 
-function buildInstruments(genre) {
+function buildInstruments(genre, instrumentId) {
   const reverb = new Tone.Reverb({ decay: 3.6, wet: 0.34 }).toDestination();
   const ready  = [reverb.generate()];
 
@@ -147,13 +210,25 @@ function buildInstruments(genre) {
     ready.push(Tone.loaded());
   }
 
+  // User instrument override applies to MELODY only — harmony/bass keep
+  // the genre's character so the result reads as "violin over a bossa".
+  if (instrumentId && INSTRUMENT_FACTORIES[instrumentId]) {
+    try { melody.disconnect(); } catch { /* not yet connected */ }
+    melody = INSTRUMENT_FACTORIES[instrumentId](reverb);
+    if (instrumentId === "piano") ready.push(Tone.loaded());
+  }
+
   const entry = { melody, harmony, bass, ready: Promise.all(ready) };
-  _instruments.set(genre, entry);
   return entry;
 }
 
-async function getInstruments(genre) {
-  const cached = _instruments.get(genre) || buildInstruments(genre);
+async function getInstruments(genre, instrumentId) {
+  const key = `${genre}::${instrumentId || ""}`;
+  let cached = _instruments.get(key);
+  if (!cached) {
+    cached = buildInstruments(genre, instrumentId || null);
+    _instruments.set(key, cached);
+  }
   await cached.ready;
   return cached;
 }
@@ -233,12 +308,25 @@ const INTENT_LABELS = {
   sleep:      "잠들기 전",
 };
 
+const INSTRUMENT_LABELS = {
+  piano:     "피아노",
+  rhodes:    "EP",
+  nylon:     "기타",
+  strings:   "현악",
+  music_box: "음악상자",
+  horn:      "호른",
+};
+
 function variantLabel(song) {
   if (song.variant_id === "auto") return "오늘";
+  const parts = [];
   if (song.intent_id && INTENT_LABELS[song.intent_id]) {
-    return INTENT_LABELS[song.intent_id];
+    parts.push(INTENT_LABELS[song.intent_id]);
   }
-  return song.variant_id;
+  if (song.instrument_id && INSTRUMENT_LABELS[song.instrument_id]) {
+    parts.push(INSTRUMENT_LABELS[song.instrument_id]);
+  }
+  return parts.length ? parts.join(" · ") : song.variant_id;
 }
 
 export class DetailPanel {
@@ -357,7 +445,8 @@ export class DetailPanel {
     await Tone.start();
 
     const genre = this.song?.genre || "ambient";
-    const { melody, harmony, bass } = await getInstruments(genre);
+    const instrumentId = this.song?.instrument_id || null;
+    const { melody, harmony, bass } = await getInstruments(genre, instrumentId);
 
     Tone.Transport.stop();
     Tone.Transport.cancel(0);

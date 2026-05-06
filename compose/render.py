@@ -84,7 +84,13 @@ def render_midi(ir: dict, path: str) -> None:
     bpm = spec["bpm"]
     genre = spec["genre"]
     bpb = float(spec["meter"].split("/")[0])
-    programs = GM_PROGRAMS.get(genre, GM_PROGRAMS["ambient"])
+    programs = dict(GM_PROGRAMS.get(genre, GM_PROGRAMS["ambient"]))
+
+    # Optional user instrument override for the melody track only.
+    inst_program = ir.get("melody_gm_program")
+    if inst_program is not None:
+        programs["melody"] = int(inst_program)
+
     pedals = ir.get("pedals", [])
 
     mid = mido.MidiFile(type=1, ticks_per_beat=TICKS_PER_BEAT)

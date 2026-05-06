@@ -55,8 +55,16 @@
     <div class="intent-inner">
       <button id="intent-close" class="close" aria-label="닫기">✕</button>
       <h3>어떤 곡으로 듣고 싶나요?</h3>
-      <p class="muted small">오늘의 날씨에 그날의 기분 한 스푼.</p>
+
+      <p class="section-label">무드</p>
       <div class="intents" id="intent-grid"></div>
+
+      <p class="section-label">사운드</p>
+      <div class="intents instruments" id="instrument-grid"></div>
+
+      <div class="modal-actions">
+        <button id="intent-submit" type="button" class="primary" disabled>곡 만들기</button>
+      </div>
       <p id="intent-status" class="muted small" hidden></p>
     </div>
   </aside>

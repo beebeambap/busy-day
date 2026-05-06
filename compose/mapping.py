@@ -84,16 +84,21 @@ def pick_genre(
 
 
 def pick_bpm(rng: Random, f: Features, genre: str) -> int:
-    # base from calmness: calm -> slow
-    center = 60 + (1.0 - f.calmness) * 30  # 60 .. 90
-    if genre in ("bossa_nova", "folk"):
+    # base from calmness: calm -> slow. Range widened so an active day
+    # actually sounds active.
+    center = 64 + (1.0 - f.calmness) * 36  # 64 .. 100
+    if genre == "bossa_nova":
+        center += 10
+    elif genre == "folk":
         center += 8
-    if genre == "lo_fi":
-        center -= 6
-    if genre == "ambient":
+    elif genre == "jazz_ballad":
+        center += 2
+    elif genre == "lo_fi":
         center -= 4
-    bpm = int(round(center + rng.uniform(-3, 3)))
-    return max(58, min(96, bpm))
+    elif genre == "ambient":
+        center -= 2
+    bpm = int(round(center + rng.uniform(-4, 4)))
+    return max(60, min(112, bpm))
 
 
 def pick_meter(rng: Random, genre: str) -> str:

@@ -32,12 +32,13 @@ INTENTS: dict[str, Intent] = {
         label_ko="차분하게",
         deltas={"calmness": +0.30, "brightness": -0.10},
         preferred_genre="ambient",
-        bpm_clamp=(58, 72),
+        bpm_clamp=(62, 76),
     ),
     "warm": Intent(
         id="warm",
         label_ko="따뜻하게",
         deltas={"warmth": +0.30, "calmness": +0.10, "wetness": -0.10},
+        bpm_clamp=(72, 92),
     ),
     "wistful": Intent(
         id="wistful",
@@ -46,6 +47,7 @@ INTENTS: dict[str, Intent] = {
                 "wetness": +0.10, "calmness": +0.20},
         mode_bias="dorian",
         avoid_genres=("bossa_nova", "folk"),
+        bpm_clamp=(68, 84),
     ),
     "lively": Intent(
         id="lively",
@@ -53,18 +55,20 @@ INTENTS: dict[str, Intent] = {
         deltas={"brightness": +0.30, "warmth": +0.10, "calmness": -0.30},
         preferred_genre="bossa_nova",
         avoid_genres=("ambient", "lo_fi"),
+        bpm_clamp=(92, 112),
     ),
     "after_rain": Intent(
         id="after_rain",
         label_ko="비 온 뒤처럼",
         deltas={"wetness": +0.30, "brightness": -0.10, "calmness": +0.20},
+        bpm_clamp=(72, 90),
     ),
     "sleep": Intent(
         id="sleep",
         label_ko="잠들기 전",
         deltas={"brightness": -0.20, "calmness": +0.40, "warmth": +0.10},
         preferred_genre="ambient",
-        bpm_clamp=(58, 68),
+        bpm_clamp=(60, 70),
     ),
 }
 

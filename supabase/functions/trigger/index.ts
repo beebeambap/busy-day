@@ -1,6 +1,6 @@
 // busy-day /trigger
 //
-// POST { date, city?, intent_id }
+// POST { date, city?, intent_id, instrument_id? }
 // -> dispatches the daily-compose GitHub Actions workflow with a
 //    user-scoped variant_id, returns { variant_id, eta_sec }.
 //
@@ -27,6 +27,9 @@ const CORS_HEADERS = {
 
 const INTENT_IDS = new Set([
   "calm", "warm", "wistful", "lively", "after_rain", "sleep",
+]);
+const INSTRUMENT_IDS = new Set([
+  "piano", "rhodes", "nylon", "strings", "music_box", "horn",
 ]);
 
 function j(body: unknown, status = 200): Response {
@@ -55,11 +58,16 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); }
   catch { return j({ error: "bad json" }, 400); }
 
-  const date     = String(body.date      ?? "today").slice(0, 16);
-  const city     = String(body.city      ?? "seoul").slice(0, 32);
-  const intentId = String(body.intent_id ?? "").slice(0, 32);
+  const date         = String(body.date          ?? "today").slice(0, 16);
+  const city         = String(body.city          ?? "seoul").slice(0, 32);
+  const intentId     = String(body.intent_id     ?? "").slice(0, 32);
+  const instrumentId = String(body.instrument_id ?? "").slice(0, 32);
+
   if (!INTENT_IDS.has(intentId)) {
     return j({ error: "invalid intent_id" }, 400);
+  }
+  if (instrumentId && !INSTRUMENT_IDS.has(instrumentId)) {
+    return j({ error: "invalid instrument_id" }, 400);
   }
 
   const pat   = Deno.env.get("GITHUB_PAT");
@@ -68,7 +76,10 @@ Deno.serve(async (req: Request) => {
   const wf    = Deno.env.get("GITHUB_WORKFLOW") ?? "daily-compose.yml";
   if (!pat) return j({ error: "server missing GITHUB_PAT" }, 500);
 
-  const variantId = `user-${kstHHMM()}-${intentId}`;
+  const tag = instrumentId
+    ? `${intentId}-${instrumentId}`
+    : intentId;
+  const variantId = `user-${kstHHMM()}-${tag}`;
 
   const ghResp = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/dispatches`,
@@ -82,7 +93,13 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         ref: "main",
-        inputs: { date, city, variant: variantId, intent: intentId },
+        inputs: {
+          date,
+          city,
+          variant: variantId,
+          intent: intentId,
+          instrument: instrumentId,
+        },
       }),
     },
   );
@@ -95,8 +112,9 @@ Deno.serve(async (req: Request) => {
   }
 
   return j({
-    variant_id: variantId,
-    intent_id:  intentId,
+    variant_id:    variantId,
+    intent_id:     intentId,
+    instrument_id: instrumentId || null,
     date, city,
     eta_sec: 90,
   });
