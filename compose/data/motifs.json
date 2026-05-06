@@ -1,8 +1,7 @@
 [
   {
     "id": "m_seed_01_falling_petal",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["sparse", "descending", "warm"],
     "contour": {
       "degrees": [5, 3, 2, 1, 6, 5, 3, 2],
@@ -12,8 +11,7 @@
   },
   {
     "id": "m_seed_02_morning_window",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["bright", "stepwise", "calm"],
     "contour": {
       "degrees": [1, 2, 3, 5, 3, 2, 1],
@@ -23,8 +21,7 @@
   },
   {
     "id": "m_seed_03_quiet_question",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["sparse", "ascending", "open"],
     "contour": {
       "degrees": [1, 5, 4, 6],
@@ -34,8 +31,7 @@
   },
   {
     "id": "m_seed_04_paper_lantern",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["pendulum", "warm"],
     "contour": {
       "degrees": [3, 5, 3, 1, 3, 5, 6, 5],
@@ -45,8 +41,7 @@
   },
   {
     "id": "m_seed_05_after_rain",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["wet", "sparse", "minor_lean"],
     "contour": {
       "degrees": [6, 5, 3, 2, 3, 1],
@@ -56,8 +51,7 @@
   },
   {
     "id": "m_seed_06_paperweight",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["pedal", "still"],
     "contour": {
       "degrees": [1, 3, 1, 5, 1, 3, 2, 1],
@@ -67,8 +61,7 @@
   },
   {
     "id": "m_seed_07_tea_steam",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["rising", "soft", "warm"],
     "contour": {
       "degrees": [1, 2, 3, 4, 5, 4, 3],
@@ -78,11 +71,231 @@
   },
   {
     "id": "m_seed_08_lattice_window",
-    "source": "human_seed",
-    "added_week": "2026-W19",
+    "source": "human_seed", "added_week": "2026-W19",
     "tags": ["geometric", "stepwise"],
     "contour": {
       "degrees": [5, 4, 3, 4, 5, 6, 5, 3],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5]
+    }
+  },
+
+  {
+    "id": "m_seed_09_orange_glow",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["warm", "descending", "soft"],
+    "contour": {
+      "degrees": [6, 5, 4, 3, 1, 2],
+      "octaves": [0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 1.0, 1.0, 0.5, 1.5]
+    }
+  },
+  {
+    "id": "m_seed_10_dust_in_sunbeam",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["bright", "sparse", "soft"],
+    "contour": {
+      "degrees": [3, 5, 6, 5, 3, 1],
+      "octaves": [0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 1.0, 0.5, 0.5, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_11_kettle_chime",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["bright", "geometric", "rising"],
+    "contour": {
+      "degrees": [1, 3, 5, 1, 3, 5, 6],
+      "octaves": [0, 0, 0, 1, 1, 1, 1],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0]
+    }
+  },
+  {
+    "id": "m_seed_12_balcony_breeze",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["warm", "soft", "ascending"],
+    "contour": {
+      "degrees": [2, 3, 5, 6, 5, 3, 2],
+      "octaves": [0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.75, 0.25, 0.5, 0.5, 0.5, 0.5, 1.0]
+    }
+  },
+  {
+    "id": "m_seed_13_pottery_wheel",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["warm", "pendulum", "calm"],
+    "contour": {
+      "degrees": [3, 1, 3, 5, 3, 1, 3, 2],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5]
+    }
+  },
+  {
+    "id": "m_seed_14_inkbrush",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["sparse", "descending", "calm"],
+    "contour": {
+      "degrees": [5, 4, 2, 1],
+      "octaves": [0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 1.0, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_15_snow_settling",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["sparse", "descending", "soft"],
+    "contour": {
+      "degrees": [7, 5, 3, 1],
+      "octaves": [0, 0, 0, 0],
+      "rhythm":  [1.0, 1.0, 1.0, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_16_glass_rim",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["calm", "sparse", "still"],
+    "contour": {
+      "degrees": [5, 6, 5, 3, 5],
+      "octaves": [0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 1.0, 1.0, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_17_fog_lift",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["wet", "ascending", "soft"],
+    "contour": {
+      "degrees": [1, 2, 3, 5, 6],
+      "octaves": [0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_18_polished_stone",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["pedal", "still", "calm"],
+    "contour": {
+      "degrees": [1, 5, 1, 5, 3, 1],
+      "octaves": [0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 1.0, 1.5]
+    }
+  },
+  {
+    "id": "m_seed_19_drizzle",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["wet", "sparse", "descending"],
+    "contour": {
+      "degrees": [6, 5, 4, 3, 2],
+      "octaves": [0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_20_rain_window",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["wet", "geometric", "minor_lean"],
+    "contour": {
+      "degrees": [1, 3, 2, 4, 3, 5, 4, 1],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    }
+  },
+  {
+    "id": "m_seed_21_undercurrent",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["wet", "minor_lean", "pendulum"],
+    "contour": {
+      "degrees": [1, 3, 5, 3, 1, 3, 6, 5],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    }
+  },
+  {
+    "id": "m_seed_22_misty_garden",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["wet", "soft", "sparse"],
+    "contour": {
+      "degrees": [3, 2, 5, 4, 3],
+      "octaves": [0, 0, 0, 0, 0],
+      "rhythm":  [1.0, 1.0, 1.0, 1.0, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_23_old_letter",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["minor_lean", "descending", "soft"],
+    "contour": {
+      "degrees": [6, 5, 4, 3, 1, 2, 1],
+      "octaves": [0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.75, 0.25, 0.5, 0.5, 1.0, 0.5, 1.5]
+    }
+  },
+  {
+    "id": "m_seed_24_fading_print",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["minor_lean", "sparse", "descending"],
+    "contour": {
+      "degrees": [3, 1, 6, 5],
+      "octaves": [0, 0, -1, -1],
+      "rhythm":  [1.0, 1.0, 1.0, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_25_quiet_room",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["minor_lean", "pedal", "still"],
+    "contour": {
+      "degrees": [1, 3, 5, 6, 5, 3, 1],
+      "octaves": [0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 2.0]
+    }
+  },
+  {
+    "id": "m_seed_26_long_corridor",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["minor_lean", "stepwise", "calm"],
+    "contour": {
+      "degrees": [2, 3, 4, 5, 4, 3, 2, 1],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5]
+    }
+  },
+  {
+    "id": "m_seed_27_tea_bowl",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["bright", "geometric", "soft"],
+    "contour": {
+      "degrees": [3, 5, 6, 5, 3, 5, 3, 1],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5]
+    }
+  },
+  {
+    "id": "m_seed_28_origami_fold",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["pendulum", "stepwise", "calm"],
+    "contour": {
+      "degrees": [3, 4, 3, 2, 3, 4, 3, 5],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5]
+    }
+  },
+  {
+    "id": "m_seed_29_lattice_climb",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["geometric", "ascending", "bright"],
+    "contour": {
+      "degrees": [1, 3, 2, 4, 3, 5, 4, 6],
+      "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
+      "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    }
+  },
+  {
+    "id": "m_seed_30_courtyard_chime",
+    "source": "human_seed", "added_week": "2026-W19",
+    "tags": ["bright", "warm", "pendulum"],
+    "contour": {
+      "degrees": [5, 3, 5, 6, 5, 3, 2, 1],
       "octaves": [0, 0, 0, 0, 0, 0, 0, 0],
       "rhythm":  [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5]
     }

@@ -304,6 +304,50 @@ SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… KMA_SERVICE_KEY=… \
 세 개를 등록한 뒤 Actions 탭 → daily compose → Run workflow 로 즉시 호출 가능.
 그 이후로는 매일 06:00 KST 자동 실행.
 
+### Phase A — 음악 품질 ↑ (완료)
+
+**모티브 풀 8 → 30** (`compose/data/motifs.json`):
+- 따뜻/밝은 5: orange_glow, dust_in_sunbeam, kettle_chime, balcony_breeze, pottery_wheel
+- 차분/조용 5: inkbrush, snow_settling, glass_rim, fog_lift, polished_stone
+- 비/촉촉 4: drizzle, rain_window, undercurrent, misty_garden
+- 회상/단조성향 4: old_letter, fading_print, quiet_room, long_corridor
+- 활기/유희 4: tea_bowl, origami_fold, lattice_climb, courtyard_chime
+
+**휴머나이즈** (`compose/humanize.py`):
+- `apply_velocity_curve` — 섹션 단위로 산형(arch) 벨로시티: 시작은 부드럽게,
+  중반에 자연스러운 피크, 끝으로 갈수록 옅게. 기본 56 ± 38 + 작은 jitter.
+- `apply_outro_decay` — OUTRO 구간 전반에 걸쳐 강제 데크레센도 (×1.0 → ×0.45)
+- `apply_micro_timing` — 음 시작 시점 ±0.018박 jitter (사람 손맛)
+- `pedal_segments` — 피아노 계열 장르(ambient/neo_classical/folk/lo_fi)에서
+  마디 단위 댐퍼 페달, 같은 코드 연속이면 페달도 이어감
+
+**서스테인 페달** (`compose/render.py`):
+- MIDI CC64 메시지로 melody/harmony 채널에 ON/OFF 기록
+- 베이스는 페달 없음(저음역 머디함 방지)
+
+**장르별 악기 분화** (`js/player.js` + Tone.js):
+| 장르 | 멜로디 | 화성 | 베이스 |
+|---|---|---|---|
+| ambient | 피아노 (release 3.0s) | AM 패드 + 리버브 | 피아노 LH |
+| neo_classical | 피아노 (release 2.6s) | 스트링 패드 | 피아노 LH |
+| folk | 피아노 (release 1.6s) | AM 패드 (드라이) | 피아노 LH |
+| lo_fi | 피아노 (release 2.4s) + lowpass 2.4kHz | AM 패드 | 피아노 LH |
+| jazz_ballad | FM Rhodes | FM Rhodes 패드 | upright bass(FM) |
+| bossa_nova | PluckSynth 나일론 | PluckSynth 컴핑 | upright bass(FM) |
+
+검증: 14일 시뮬레이션에서 모두 시그니처 유니크, 신규 모티브 8종 출현, 6장르 모두 사용.
+
+### 공휴일/특별한 날 메모 (한 달 운영 후 작업)
+
+크리스마스, 어린이날, 설날 같은 날에는 별도 감정 코드를 주입:
+- 따뜻한 날(크리스마스): 따뜻 +0.3, 단조성향 -0.2, 종소리 텍스처
+- 어린이날: 밝음 +0.4, 장조 강제, 더 활기찬 BPM
+- 추석/설날: 페달 강화, 더 긴 잔향, 명상적 모드
+
+`compose/holidays.py` 로 (date_iso, country) → 보너스 features delta 매핑.
+v1.1 에서 추가 — 1년 운영 데이터 + 한 사이클 분량 들어본 다음 어울리는
+처리 결정.
+
 ### Phase 5 — Edge Function 수동 트리거 (미착수)
 
 웹 UI "오늘 곡 만들기" 버튼 → Supabase Edge Function `/trigger` →

@@ -23,6 +23,12 @@ from random import Random
 from . import GENERATOR_VER
 from .features import Features
 from .harmony import progression, voicing_for_genre
+from .humanize import (
+    apply_micro_timing,
+    apply_outro_decay,
+    apply_velocity_curve,
+    pedal_segments,
+)
 from .melody import melody_over_progression
 from .scales import chord_pitches, degree_to_midi
 
@@ -193,6 +199,26 @@ def compose_ir(
 
         cur_bar += 1
 
+    # ── humanization passes (deterministic via salted RNG) ──────────
+    # Section breaks become phrase boundaries for the velocity arch.
+    section_break_bars: list[int] = []
+    acc = 0
+    for s in form:
+        section_break_bars.append(acc)
+        acc += sec_len[s]
+    outro_start_bar = total_bars - sec_len["OUTRO"]
+
+    apply_velocity_curve(
+        melody_events, rng,
+        section_breaks=section_break_bars,
+    )
+    apply_outro_decay(melody_events, outro_start_bar)
+    apply_micro_timing(melody_events, rng, jitter_beats=0.018)
+
+    pedals = pedal_segments(
+        genre=genre, total_bars=total_bars, bpb=bpb, chord_seq=chord_seq,
+    )
+
     # signature & start_pitch for anti-repetition memory
     sig_input = (
         ",".join(str(d) for d in chord_seq)
@@ -234,6 +260,7 @@ def compose_ir(
             "harmony": harmony_events,
             "bass":    bass_events,
         },
+        "pedals": pedals,
         "signature": signature,
         "start_pitch": _pitch_class_name(start_pitch_midi),
         "ring_out_beats": ring_out_beats,

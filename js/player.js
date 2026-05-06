@@ -20,43 +20,142 @@ const DOWNLOAD_KEYS = [
   ["ir_short",  "IR (json)"],
 ];
 
-// Salamander grand piano samples — Tone.js's reference dataset, hosted by
-// the project. ~6 MB across the velocity layers we ask for.
-const SALAMANDER_BASE =
-  "https://tonejs.github.io/audio/salamander/";
-const SAMPLE_PITCHES = ["A0","C1","D#1","F#1","A1","C2","D#2","F#2","A2",
-                        "C3","D#3","F#3","A3","C4","D#4","F#4","A4","C5",
-                        "D#5","F#5","A5","C6"];
+// Salamander grand piano (Tone.js reference dataset, ~6 MB total).
+const SALAMANDER_BASE = "https://tonejs.github.io/audio/salamander/";
+const SAMPLE_PITCHES = [
+  "A0","C1","D#1","F#1","A1","C2","D#2","F#2","A2",
+  "C3","D#3","F#3","A3","C4","D#4","F#4","A4","C5",
+  "D#5","F#5","A5","C6",
+];
 
-let pianoPromise = null;
-let pad = null;     // soft pad layer for harmony track
+// Per-genre piano release time. Longer = more pedalled / ambient feel.
+const PIANO_RELEASE = {
+  ambient:        3.0,
+  neo_classical:  2.6,
+  folk:           1.6,
+  lo_fi:          2.4,
+};
 
-function getPiano() {
-  if (pianoPromise) return pianoPromise;
-  const urls = Object.fromEntries(SAMPLE_PITCHES.map((n) => [n, n.replace("#","s") + ".mp3"]));
-  const piano = new Tone.Sampler({
-    urls,
-    baseUrl: SALAMANDER_BASE,
-    release: 1.4,
-    volume: -4,
-  }).toDestination();
-  pianoPromise = Tone.loaded().then(() => piano);
-  return pianoPromise;
+function makePiano(release, volume) {
+  const urls = Object.fromEntries(
+    SAMPLE_PITCHES.map((n) => [n, n.replace("#", "s") + ".mp3"])
+  );
+  return new Tone.Sampler({
+    urls, baseUrl: SALAMANDER_BASE, release, volume,
+  });
 }
 
-function getPad() {
-  if (pad) return pad;
-  // simple AM-synth pad for the harmony layer
-  pad = new Tone.PolySynth(Tone.AMSynth, {
-    harmonicity: 1.5,
-    envelope:   { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.4 },
-    modulation: { type: "sine" },
-    modulationEnvelope: { attack: 0.8, decay: 0.2, sustain: 0.7, release: 1.2 },
-    volume: -22,
+function makeRhodes(volume) {
+  return new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity:    8,
+    modulationIndex: 2,
+    oscillator: { type: "sine" },
+    envelope:   { attack: 0.005, decay: 0.6, sustain: 0.35, release: 1.4 },
+    modulation: { type: "square" },
+    modulationEnvelope: {
+      attack: 0.01, decay: 0.5, sustain: 0.0, release: 0.4,
+    },
+    volume,
   });
-  const verb = new Tone.Reverb({ decay: 4, wet: 0.45 }).toDestination();
-  pad.connect(verb);
-  return pad;
+}
+
+function makeNylon(volume) {
+  return new Tone.PolySynth(Tone.PluckSynth, {
+    attackNoise: 0.6,
+    dampening:   4200,
+    resonance:   0.96,
+    volume,
+  });
+}
+
+function makeUprightBass(volume) {
+  return new Tone.PolySynth(Tone.FMSynth, {
+    harmonicity:    1.0,
+    modulationIndex: 4,
+    envelope:   { attack: 0.01, decay: 0.7, sustain: 0.0, release: 0.8 },
+    modulation: { type: "sine" },
+    modulationEnvelope: {
+      attack: 0.02, decay: 0.3, sustain: 0.0, release: 0.4,
+    },
+    volume,
+  });
+}
+
+function makeAMPad(volume) {
+  return new Tone.PolySynth(Tone.AMSynth, {
+    harmonicity: 1.5,
+    envelope:   { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 },
+    modulation: { type: "sine" },
+    modulationEnvelope: {
+      attack: 0.8, decay: 0.2, sustain: 0.7, release: 1.2,
+    },
+    volume,
+  });
+}
+
+function makeStringPad(volume) {
+  return new Tone.PolySynth(Tone.AMSynth, {
+    harmonicity: 2,
+    oscillator: { type: "sawtooth4" },
+    envelope:   { attack: 1.2, decay: 0.5, sustain: 0.85, release: 2.6 },
+    modulation: { type: "sine" },
+    modulationEnvelope: {
+      attack: 1.4, decay: 0.4, sustain: 0.8, release: 2.0,
+    },
+    volume,
+  });
+}
+
+const _instruments = new Map(); // genre -> { melody, harmony, bass, ready }
+
+function buildInstruments(genre) {
+  const reverb = new Tone.Reverb({ decay: 3.6, wet: 0.34 }).toDestination();
+  const ready  = [reverb.generate()];
+
+  let melody, harmony, bass;
+
+  if (genre === "jazz_ballad") {
+    melody  = makeRhodes(-10).connect(reverb);
+    harmony = makeRhodes(-18).connect(reverb);
+    bass    = makeUprightBass(-12).toDestination();
+  } else if (genre === "bossa_nova") {
+    melody  = makeNylon(-8).connect(reverb);
+    harmony = makeNylon(-14).connect(reverb);
+    bass    = makeUprightBass(-10).toDestination();
+  } else {
+    // ambient / neo_classical / folk / lo_fi : piano-led
+    const release = PIANO_RELEASE[genre] ?? 2.0;
+    const isLoFi = genre === "lo_fi";
+    melody = makePiano(release, isLoFi ? -8 : -4);
+
+    if (isLoFi) {
+      const lp = new Tone.Filter({
+        frequency: 2400, type: "lowpass", rolloff: -12,
+      });
+      melody.connect(lp); lp.connect(reverb);
+    } else {
+      melody.connect(reverb);
+    }
+
+    if (genre === "neo_classical") {
+      harmony = makeStringPad(-18).connect(reverb);
+    } else {
+      harmony = makeAMPad(-22).connect(reverb);
+    }
+
+    bass = makePiano(release * 0.7, -10).toDestination();
+    ready.push(Tone.loaded());
+  }
+
+  const entry = { melody, harmony, bass, ready: Promise.all(ready) };
+  _instruments.set(genre, entry);
+  return entry;
+}
+
+async function getInstruments(genre) {
+  const cached = _instruments.get(genre) || buildInstruments(genre);
+  await cached.ready;
+  return cached;
 }
 
 function fmtTime(sec) {
@@ -78,42 +177,37 @@ function fmtMeta(s) {
 function fmtWeatherValue(k, v) {
   if (v == null) return "—";
   switch (k) {
-    case "temp_c":      return `${Number(v).toFixed(1)}°C`;
-    case "temp_range":  return `${Number(v).toFixed(1)}°C`;
-    case "humidity":    return `${Math.round(Number(v))}%`;
-    case "precip_mm":   return `${Number(v).toFixed(1)} mm`;
-    case "wind_mps":    return `${Number(v).toFixed(1)} m/s`;
-    case "cloud_pct":   return `${Math.round(Number(v))}%`;
-    default:            return String(v);
+    case "temp_c":     return `${Number(v).toFixed(1)}°C`;
+    case "temp_range": return `${Number(v).toFixed(1)}°C`;
+    case "humidity":   return `${Math.round(Number(v))}%`;
+    case "precip_mm":  return `${Number(v).toFixed(1)} mm`;
+    case "wind_mps":   return `${Number(v).toFixed(1)} m/s`;
+    case "cloud_pct":  return `${Math.round(Number(v))}%`;
+    default:           return String(v);
   }
 }
 
 export class DetailPanel {
   constructor({ root }) {
-    this.root = root;
-    this.dateEl = root.querySelector("#detail-date");
-    this.metaEl = root.querySelector("#detail-meta");
-    this.scoreEl = root.querySelector("#detail-score");
-    this.scoreEmpty = root.querySelector("#detail-score-empty");
-    this.statusEl = root.querySelector("#player-status");
-    this.weatherEl = root.querySelector("#detail-weather");
+    this.root        = root;
+    this.dateEl      = root.querySelector("#detail-date");
+    this.metaEl      = root.querySelector("#detail-meta");
+    this.scoreEl     = root.querySelector("#detail-score");
+    this.scoreEmpty  = root.querySelector("#detail-score-empty");
+    this.statusEl    = root.querySelector("#player-status");
+    this.weatherEl   = root.querySelector("#detail-weather");
     this.downloadsEl = root.querySelector("#detail-downloads");
-    this.toggleEl = root.querySelector(".variant-toggle");
-    this.playBtn = root.querySelector("#play-btn");
-    this.progressEl = root.querySelector("#play-progress");
-    this.timeEl = root.querySelector("#play-time");
+    this.toggleEl    = root.querySelector(".variant-toggle");
+    this.playBtn     = root.querySelector("#play-btn");
+    this.progressEl  = root.querySelector("#play-progress");
+    this.timeEl      = root.querySelector("#play-time");
 
     this.midi = null;
-    this.scheduledIds = [];
     this.duration = 0;
     this.tickHandle = null;
 
-    root.querySelector("#detail-close").addEventListener("click", () =>
-      this.close()
-    );
-    root.addEventListener("click", (e) => {
-      if (e.target === root) this.close();
-    });
+    root.querySelector("#detail-close").addEventListener("click", () => this.close());
+    root.addEventListener("click", (e) => { if (e.target === root) this.close(); });
     document.addEventListener("keydown", (e) => {
       if (!root.hidden && e.key === "Escape") this.close();
     });
@@ -183,7 +277,7 @@ export class DetailPanel {
       this.duration = this.midi.duration;
       this.timeEl.textContent = `0:00 / ${fmtTime(this.duration)}`;
       this.progressEl.value = 0;
-      this.statusEl.textContent = "재생 준비 — 첫 재생 시 피아노 샘플 다운로드";
+      this.statusEl.textContent = "재생 준비 — 첫 재생 시 악기 로드";
       this.playBtn.disabled = false;
     } catch (err) {
       console.error(err);
@@ -201,26 +295,28 @@ export class DetailPanel {
 
   async play() {
     if (!this.midi) return;
-    this.statusEl.textContent = "피아노 샘플 로딩 중…";
+    this.statusEl.textContent = "악기 로드 중…";
     this.playBtn.disabled = true;
     await Tone.start();
-    const piano = await getPiano();
-    const pad   = getPad();
+
+    const genre = this.song?.genre || "ambient";
+    const { melody, harmony, bass } = await getInstruments(genre);
 
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
 
-    // schedule notes
     const t0 = 0.05;
     this.midi.tracks.forEach((track) => {
-      const isHarmony = /harmony/i.test(track.name || "")
-        || track.notes.some((n) => track.notes.filter(
-          (x) => Math.abs(x.time - n.time) < 0.001).length >= 3);
+      const name = (track.name || "").toLowerCase();
+      let inst;
+      if (name.includes("harmony"))   inst = harmony;
+      else if (name.includes("bass")) inst = bass;
+      else                            inst = melody;
+
       track.notes.forEach((note) => {
-        const inst = isHarmony ? pad : piano;
         Tone.Transport.schedule((time) => {
           inst.triggerAttackRelease(
-            note.name, note.duration, time, note.velocity * 0.85
+            note.name, note.duration, time, note.velocity * 0.85,
           );
         }, t0 + note.time);
       });
@@ -231,7 +327,7 @@ export class DetailPanel {
     Tone.Transport.start();
     this.playBtn.textContent = "■";
     this.playBtn.disabled = false;
-    this.statusEl.textContent = "재생 중";
+    this.statusEl.textContent = `재생 중 — ${genre.replace(/_/g, " ")}`;
     this._tick();
 
     if (this.song) recordPlay(this.song.id, this.variant).catch(() => {});

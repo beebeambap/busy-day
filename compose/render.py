@@ -63,12 +63,29 @@ def _flush_track(tr: mido.MidiTrack, abs_msgs: list[tuple[int, mido.Message]]) -
         last = t
 
 
+def _pedal_messages(
+    pedals: list[dict], channel: int, bpb: float,
+) -> list[tuple[int, mido.Message]]:
+    out = []
+    for seg in pedals:
+        on_t  = (seg["from_bar"] * bpb + seg["on"])  * TICKS_PER_BEAT
+        off_t = (seg["to_bar"]   * bpb + seg["off"]) * TICKS_PER_BEAT
+        out.append((int(on_t),
+                    mido.Message("control_change", channel=channel,
+                                 control=64, value=127)))
+        out.append((int(off_t),
+                    mido.Message("control_change", channel=channel,
+                                 control=64, value=0)))
+    return out
+
+
 def render_midi(ir: dict, path: str) -> None:
     spec = ir["spec"]
     bpm = spec["bpm"]
     genre = spec["genre"]
     bpb = float(spec["meter"].split("/")[0])
     programs = GM_PROGRAMS.get(genre, GM_PROGRAMS["ambient"])
+    pedals = ir.get("pedals", [])
 
     mid = mido.MidiFile(type=1, ticks_per_beat=TICKS_PER_BEAT)
 
@@ -83,19 +100,21 @@ def render_midi(ir: dict, path: str) -> None:
                                  name=f"busy day {ir['meta']['date']}", time=0))
     mid.tracks.append(meta)
 
-    # melody
+    # melody (with sustain pedal CC64 on the same channel)
     mel = _track_with_program("melody", programs["melody"], channel=0)
-    _flush_track(mel,
-                 _events_to_messages(ir["tracks"]["melody"], channel=0, bpb=bpb))
+    mel_msgs = _events_to_messages(ir["tracks"]["melody"], channel=0, bpb=bpb)
+    mel_msgs += _pedal_messages(pedals, channel=0, bpb=bpb)
+    _flush_track(mel, mel_msgs)
     mid.tracks.append(mel)
 
-    # harmony
+    # harmony (also pedaled to keep pad legato across chord changes)
     har = _track_with_program("harmony", programs["harmony"], channel=1)
-    _flush_track(har,
-                 _events_to_messages(ir["tracks"]["harmony"], channel=1, bpb=bpb))
+    har_msgs = _events_to_messages(ir["tracks"]["harmony"], channel=1, bpb=bpb)
+    har_msgs += _pedal_messages(pedals, channel=1, bpb=bpb)
+    _flush_track(har, har_msgs)
     mid.tracks.append(har)
 
-    # bass
+    # bass (no pedal — would muddy the low register)
     bas = _track_with_program("bass", programs["bass"], channel=2)
     _flush_track(bas,
                  _events_to_messages(ir["tracks"]["bass"], channel=2, bpb=bpb))
