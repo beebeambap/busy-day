@@ -348,12 +348,56 @@ SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… KMA_SERVICE_KEY=… \
 v1.1 에서 추가 — 1년 운영 데이터 + 한 사이클 분량 들어본 다음 어울리는
 처리 결정.
 
-### Phase 5 — Edge Function 수동 트리거 (미착수)
+### Phase B — 다중 변주 + 의견 트리거 (완료)
 
-웹 UI "오늘 곡 만들기" 버튼 → Supabase Edge Function `/trigger` →
-`workflow_dispatch` GitHub API → 위 워크플로 실행 → 폴링으로 결과 표시.
+하루에 여러 곡, 사용자가 무드를 지정. 모두 결정적·룰 기반(LLM 0).
 
-GH Actions 가 자동/수동 모두 정상 동작하는 게 확인되면 다음 페이즈로 진행.
+**스키마**
+- `songs`: `variant_id text not null default 'auto'` + `intent_id text` 추가
+- unique 제약 변경: `(city_id, date, generator_ver, variant_id)`
+- 기존 cron 곡은 `variant_id='auto'` 유지 — **절대 덮어쓰지 않음**
+- Storage 경로: `{city}/{Y}/{M}/{date}/{variant_id}/...`
+
+**Intent 6종** (`compose/intent.py`)
+| id | 한국어 | 핵심 효과 |
+|---|---|---|
+| calm | 차분하게 | calmness +0.30, ambient 선호, BPM 58–72 |
+| warm | 따뜻하게 | warmth +0.30, calmness +0.10 |
+| wistful | 쓸쓸하게 | brightness -0.30, dorian 강제, bossa/folk 회피 |
+| lively | 활기차게 | brightness +0.30, calmness -0.30, bossa 선호 |
+| after_rain | 비 온 뒤처럼 | wetness +0.30, brightness -0.10 |
+| sleep | 잠들기 전 | calmness +0.40, ambient 선호, BPM 58–68 |
+
+intent → feature delta + (mode_bias / preferred_genre / avoid_genres /
+bpm_clamp). 사용자 트리거는 `seed_salt` 도 같이 적용해서 같은 날짜에서도
+mode/key/motif 다른 draw 보장.
+
+**파이프라인** (`compose/pipeline.py`, `daily.py`)
+- `generate_pair(..., intent=, seed_salt=)` 추가
+- `daily.py --variant <id> --intent <preset>` 추가
+- 사용자 변주 ID: `user-HHMM-<intent>` (예: `user-1430-calm`)
+
+**GitHub Actions** (`.github/workflows/daily-compose.yml`)
+- inputs: `date / city / variant / intent`
+- cron 은 모두 기본값 → variant=auto, intent=""
+
+**Edge Function** `/trigger` (`supabase/functions/trigger`)
+- POST `{ date, city, intent_id }` → workflow_dispatch 호출
+- 응답 `{ variant_id, intent_id, eta_sec }`
+- `GITHUB_PAT` 환경변수만 필요
+
+**웹 UI**
+- 캘린더 하단 **"+ 오늘 곡 더 만들기"** 버튼
+- 6개 intent 카드 모달 → 클릭 시 `/trigger` POST → 6초 간격 polling →
+  새 row 발견 시 디테일 모달로 전환
+- 디테일 헤더에 **변주 칩**: `[오늘] [차분] [따뜻]…` — 클릭 시 즉시 스왑
+- 캘린더 셀 우하단에 변주 개수 배지(`+2`)
+- 다운로드 파일명에 `{date}_{tempC-sky}_{genre}_{kind}.{ext}` 자동 적용
+
+**필요한 사용자 액션 (1회)**
+1. GitHub Fine-grained PAT 생성 (Actions: Read and write)
+2. Supabase Dashboard → Project Settings → Edge Functions →
+   Secret 추가: `GITHUB_PAT = github_pat_xxx`
 
 ---
 

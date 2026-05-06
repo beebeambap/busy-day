@@ -44,7 +44,22 @@
       <span class="dot dot-on"></span> 곡 있음
       <span class="dot dot-off"></span> 아직 없음
     </p>
+
+    <div class="make-row">
+      <button id="make-btn" type="button" class="make">+ 오늘 곡 더 만들기</button>
+    </div>
   </main>
+
+  <!-- ── intent picker ───────────────────────────────────────── -->
+  <aside id="intent" class="intent-modal" hidden aria-hidden="true">
+    <div class="intent-inner">
+      <button id="intent-close" class="close" aria-label="닫기">✕</button>
+      <h3>어떤 곡으로 듣고 싶나요?</h3>
+      <p class="muted small">오늘의 날씨에 그날의 기분 한 스푼.</p>
+      <div class="intents" id="intent-grid"></div>
+      <p id="intent-status" class="muted small" hidden></p>
+    </div>
+  </aside>
 
   <!-- ── detail modal ────────────────────────────────────────── -->
   <aside id="detail" class="detail" hidden aria-hidden="true">
@@ -53,6 +68,7 @@
       <header class="detail-head">
         <h3 id="detail-date">—</h3>
         <p id="detail-meta" class="muted">—</p>
+        <div id="detail-variants" class="variant-chips" hidden></div>
       </header>
 
       <figure class="score">

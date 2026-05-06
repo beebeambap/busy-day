@@ -98,6 +98,7 @@ class Supabase:
         return r.json()
 
 
-def storage_path(city_id: str, date_iso: str, basename: str) -> str:
+def storage_path(city_id: str, date_iso: str, basename: str,
+                 variant_id: str = "auto") -> str:
     y, m, _d = date_iso.split("-")
-    return f"{city_id}/{y}/{m}/{date_iso}/{basename}"
+    return f"{city_id}/{y}/{m}/{date_iso}/{variant_id}/{basename}"

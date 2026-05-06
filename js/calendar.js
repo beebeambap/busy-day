@@ -81,14 +81,23 @@ export class CalendarView {
       num.textContent = d.getDate();
       cell.appendChild(num);
 
-      const song = songs.get(dStr);
-      if (song && inMonth) {
+      const variants = songs.get(dStr);
+      if (variants && variants.length && inMonth) {
+        const primary = variants[0];   // auto first if present, else newest
         cell.classList.add("has-song");
         const tag = document.createElement("span");
         tag.className = "genre";
-        tag.textContent = (song.genre || "").replace(/_/g, " ");
+        tag.textContent = (primary.genre || "").replace(/_/g, " ");
         cell.appendChild(tag);
-        cell.addEventListener("click", () => this.onDayClick(song));
+        if (variants.length > 1) {
+          const c = document.createElement("span");
+          c.className = "count";
+          c.textContent = `+${variants.length - 1}`;
+          cell.appendChild(c);
+        }
+        cell.addEventListener("click", () =>
+          this.onDayClick(primary, variants),
+        );
       }
 
       this.gridEl.appendChild(cell);

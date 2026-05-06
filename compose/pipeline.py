@@ -8,6 +8,7 @@ from typing import Any
 from . import GENERATOR_VER
 from .arrange import compose_ir
 from .features import extract
+from .intent import Intent, apply as apply_intent
 from .mapping import (
     pick_bpm,
     pick_genre,
@@ -26,57 +27,40 @@ def _decide_spec(
     avoid_genres: list[str] | None,
     avoid_motifs: list[str] | None,
     preferred_genre: str | None,
+    intent: Intent | None = None,
+    seed_salt: str = "",
 ) -> dict:
-    mode  = pick_mode(rng(seed, "main"), features)
-    key   = pick_key(rng(seed, "key"), features)
-    genre = pick_genre(
-        rng(seed, "genre"), features,
-        avoid=avoid_genres, preferred=preferred_genre,
-    )
-    bpm   = pick_bpm(rng(seed, "bpm"), features, genre)
-    meter = pick_meter(rng(seed, "meter"), genre)
-    motif = pick_motif(
-        rng(seed, "motif"), features,
-        avoid_ids=set(avoid_motifs or []),
-    )
+    """seed_salt lets us produce a different draw for the same date when
+    the user requests a manual variant. The base seed (= same day = same
+    auto song) stays untouched."""
+    s = lambda label: rng(seed, f"{seed_salt}{label}")
+
+    if intent and intent.mode_bias:
+        mode = intent.mode_bias
+    else:
+        mode = pick_mode(s("mode"), features)
+
+    key = pick_key(s("key"), features)
+
+    eff_avoid = list(avoid_genres or [])
+    if intent and intent.avoid_genres:
+        eff_avoid.extend(intent.avoid_genres)
+    pref = preferred_genre or (intent.preferred_genre if intent else None)
+    genre = pick_genre(s("genre"), features, avoid=eff_avoid, preferred=pref)
+
+    bpm = pick_bpm(s("bpm"), features, genre)
+    if intent and intent.bpm_clamp:
+        lo, hi = intent.bpm_clamp
+        bpm = max(lo, min(hi, bpm))
+
+    meter = pick_meter(s("meter"), genre)
+    motif = pick_motif(s("motif"), features,
+                       avoid_ids=set(avoid_motifs or []))
+
     return {
         "key_root": key, "mode": mode, "genre": genre,
         "bpm": bpm, "meter": meter, "motif": motif,
     }
-
-
-def generate(
-    *,
-    date_iso: str,
-    city_id: str,
-    weather: dict,
-    target_sec: float = 60.0,
-    avoid_genres: list[str] | None = None,
-    avoid_motifs: list[str] | None = None,
-    preferred_genre: str | None = None,
-    generator_ver: str = GENERATOR_VER,
-) -> dict:
-    """Single-variant convenience wrapper. See `generate_pair` for both
-    short + long."""
-    seed = make_seed(date_iso, city_id, generator_ver)
-    features = extract(weather)
-    spec = _decide_spec(
-        seed, features,
-        avoid_genres=avoid_genres,
-        avoid_motifs=avoid_motifs,
-        preferred_genre=preferred_genre,
-    )
-    ir = compose_ir(
-        date_iso=date_iso,
-        city_id=city_id,
-        seed=seed,
-        rng=rng(seed, f"compose:{int(target_sec)}"),
-        features=features,
-        spec=spec,
-        target_sec=target_sec,
-    )
-    ir["weather"] = weather
-    return ir
 
 
 def generate_pair(
@@ -89,6 +73,8 @@ def generate_pair(
     avoid_genres: list[str] | None = None,
     avoid_motifs: list[str] | None = None,
     preferred_genre: str | None = None,
+    intent: Intent | None = None,
+    seed_salt: str = "",
     generator_ver: str = GENERATOR_VER,
 ) -> tuple[dict, dict]:
     """Generate the short and long variants of the same song.
@@ -98,22 +84,55 @@ def generate_pair(
     """
     seed = make_seed(date_iso, city_id, generator_ver)
     features = extract(weather)
+    if intent is not None:
+        features = apply_intent(intent, features)
+
     spec = _decide_spec(
         seed, features,
         avoid_genres=avoid_genres,
         avoid_motifs=avoid_motifs,
         preferred_genre=preferred_genre,
+        intent=intent,
+        seed_salt=seed_salt,
     )
+
     ir_short = compose_ir(
         date_iso=date_iso, city_id=city_id, seed=seed,
-        rng=rng(seed, "compose:short"),
+        rng=rng(seed, f"{seed_salt}compose:short"),
         features=features, spec=spec, target_sec=short_sec,
     )
     ir_long = compose_ir(
         date_iso=date_iso, city_id=city_id, seed=seed,
-        rng=rng(seed, "compose:long"),
+        rng=rng(seed, f"{seed_salt}compose:long"),
         features=features, spec=spec, target_sec=long_sec,
     )
     ir_short["weather"] = weather
     ir_long["weather"]  = weather
+    if intent is not None:
+        ir_short["intent_id"] = intent.id
+        ir_long["intent_id"]  = intent.id
     return ir_short, ir_long
+
+
+def generate(
+    *,
+    date_iso: str,
+    city_id: str,
+    weather: dict,
+    target_sec: float = 60.0,
+    avoid_genres: list[str] | None = None,
+    avoid_motifs: list[str] | None = None,
+    preferred_genre: str | None = None,
+    intent: Intent | None = None,
+    seed_salt: str = "",
+    generator_ver: str = GENERATOR_VER,
+) -> dict:
+    """Single-variant convenience wrapper used by the offline CLI."""
+    short, _ = generate_pair(
+        date_iso=date_iso, city_id=city_id, weather=weather,
+        short_sec=target_sec, long_sec=target_sec * 2.2,
+        avoid_genres=avoid_genres, avoid_motifs=avoid_motifs,
+        preferred_genre=preferred_genre, intent=intent,
+        seed_salt=seed_salt, generator_ver=generator_ver,
+    )
+    return short

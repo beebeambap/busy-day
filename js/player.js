@@ -224,11 +224,29 @@ function fmtWeatherValue(k, v) {
   }
 }
 
+const INTENT_LABELS = {
+  calm:       "차분",
+  warm:       "따뜻",
+  wistful:    "쓸쓸",
+  lively:     "활기",
+  after_rain: "비 온 뒤",
+  sleep:      "잠들기 전",
+};
+
+function variantLabel(song) {
+  if (song.variant_id === "auto") return "오늘";
+  if (song.intent_id && INTENT_LABELS[song.intent_id]) {
+    return INTENT_LABELS[song.intent_id];
+  }
+  return song.variant_id;
+}
+
 export class DetailPanel {
   constructor({ root }) {
     this.root        = root;
     this.dateEl      = root.querySelector("#detail-date");
     this.metaEl      = root.querySelector("#detail-meta");
+    this.variantsEl  = root.querySelector("#detail-variants");
     this.scoreEl     = root.querySelector("#detail-score");
     this.scoreEmpty  = root.querySelector("#detail-score-empty");
     this.statusEl    = root.querySelector("#player-status");
@@ -258,10 +276,12 @@ export class DetailPanel {
     this.playBtn.addEventListener("click", () => this.togglePlayback());
   }
 
-  open(song) {
+  open(song, variants = null) {
     this.song = song;
+    this.variants = variants && variants.length ? variants : [song];
     this.dateEl.textContent = formatDate(song.date);
     this.metaEl.textContent = fmtMeta(song);
+    this.renderVariantChips();
 
     const svgUrl = publicUrl(song.paths?.svg);
     this.scoreEl.innerHTML = "";
@@ -394,6 +414,49 @@ export class DetailPanel {
       }
     };
     this.tickHandle = requestAnimationFrame(update);
+  }
+
+  renderVariantChips() {
+    this.variantsEl.innerHTML = "";
+    if (!this.variants || this.variants.length <= 1) {
+      this.variantsEl.hidden = true;
+      return;
+    }
+    this.variantsEl.hidden = false;
+    for (const v of this.variants) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = variantLabel(v);
+      if (v.id === this.song.id) b.classList.add("active");
+      b.addEventListener("click", () => {
+        if (v.id === this.song.id) return;
+        this.swapTo(v);
+      });
+      this.variantsEl.appendChild(b);
+    }
+  }
+
+  swapTo(song) {
+    this.stop();
+    this.song = song;
+    this.metaEl.textContent = fmtMeta(song);
+
+    const svgUrl = publicUrl(song.paths?.svg);
+    this.scoreEl.innerHTML = "";
+    if (svgUrl) {
+      this.scoreEmpty.hidden = true;
+      this.scoreEl.hidden = false;
+      fetch(svgUrl)
+        .then((r) => r.ok ? r.text() : Promise.reject(r.status))
+        .then((svg) => { this.scoreEl.innerHTML = svg; })
+        .catch(() => {
+          this.scoreEl.hidden = true;
+          this.scoreEmpty.hidden = false;
+        });
+    }
+    this.renderDownloads(song.paths);
+    this.renderVariantChips();
+    this.setVariant("short");
   }
 
   renderWeather(w) {

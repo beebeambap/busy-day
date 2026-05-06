@@ -303,6 +303,98 @@ main {
 .score-svg { width: 100%; overflow-x: auto; }
 .score-svg svg { width: 100%; height: auto; display: block; }
 
+/* ── make button + intent picker ─────────────────────────── */
+.make-row {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+}
+.make-row .make {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 1.1rem;
+}
+
+.intent-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 14, 0.32);
+  display: grid;
+  place-items: center;
+  z-index: 12;
+  animation: fade 0.18s ease-out;
+}
+.intent-inner {
+  background: var(--bg);
+  width: min(440px, 92vw);
+  padding: 1.75rem 1.75rem 1.5rem;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+}
+.intent-inner h3 {
+  font-family: var(--serif);
+  font-weight: 400;
+  margin: 0 0 0.25rem;
+  font-size: 18px;
+  letter-spacing: 0.03em;
+}
+.intents {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin: 1.25rem 0 0.75rem;
+}
+.intents button {
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+  padding: 0.85rem 0.5rem;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+.intents button:hover { background: #f1ede5; }
+.intents button:disabled { opacity: 0.4; cursor: progress; }
+.intents button .sub {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+/* ── variant chips inside detail head ────────────────────── */
+.variant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0.25rem;
+}
+.variant-chips button {
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+  padding: 0.25rem 0.6rem;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border-radius: 0;
+}
+.variant-chips button.active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+.variant-chips button:hover:not(.active) { background: #f1ede5; }
+
+/* ── calendar variant count badge ────────────────────────── */
+.cell .count {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
 .weather {
   display: grid;
   grid-template-columns: max-content 1fr;

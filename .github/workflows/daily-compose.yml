@@ -14,6 +14,14 @@ on:
         description: "city id"
         type: string
         default: "seoul"
+      variant:
+        description: "variant id ('auto' for cron, 'user-HHMM-<intent>' for manual)"
+        type: string
+        default: "auto"
+      intent:
+        description: "intent preset (calm/warm/wistful/lively/after_rain/sleep)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -42,6 +50,12 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_STORAGE_BUCKET:   busy-day-archive
         run: |
-          DATE="${{ github.event.inputs.date || 'today' }}"
-          CITY="${{ github.event.inputs.city || 'seoul' }}"
-          python -m compose daily --date "$DATE" --city "$CITY"
+          DATE="${{ github.event.inputs.date    || 'today'  }}"
+          CITY="${{ github.event.inputs.city    || 'seoul'  }}"
+          VARIANT="${{ github.event.inputs.variant || 'auto' }}"
+          INTENT="${{ github.event.inputs.intent || '' }}"
+          ARGS="--date $DATE --city $CITY --variant $VARIANT"
+          if [ -n "$INTENT" ]; then
+            ARGS="$ARGS --intent $INTENT"
+          fi
+          python -m compose daily $ARGS
