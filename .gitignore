@@ -1,0 +1,18 @@
+.env
+.env.local
+.env.*.local
+
+node_modules/
+dist/
+build/
+.cache/
+
+# generated assets
+out/
+renders/
+*.wav
+*.mid
+
+# os
+.DS_Store
+Thumbs.db
