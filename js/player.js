@@ -188,12 +188,9 @@ function _slug(s) {
 
 function buildDownloadName(song, suffix) {
   const date = song.date || "song";
-  const city = _slug(song.city_id) || "song";
   const weather = _weatherTag(song.weather);
-  const keyMode = [song.key_root, song.mode]
-    .filter(Boolean).map(_slug).join("-");
   const genre = _slug(song.genre);
-  const parts = ["busy-day", date, city, weather, keyMode, genre]
+  const parts = ["busy-day", date, weather, genre]
     .filter((p) => p && p.length);
   return `${parts.join("_")}_${suffix}`;
 }
