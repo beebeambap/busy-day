@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>busy day</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body data-state="loading">
+
+  <!-- ── password gate ───────────────────────────────────────── -->
+  <section id="gate" class="gate" hidden>
+    <form id="gate-form" autocomplete="off">
+      <h1>busy day</h1>
+      <p class="muted">매일의 날씨로 빚은 1분.</p>
+      <input id="gate-input" type="password" placeholder="비밀번호" autofocus required>
+      <button type="submit">들어가기</button>
+      <p id="gate-error" class="error" hidden>틀렸습니다.</p>
+    </form>
+  </section>
+
+  <!-- ── main app ────────────────────────────────────────────── -->
+  <main id="app" hidden>
+    <header class="topbar">
+      <div class="brand">busy day</div>
+      <div class="meta"><span id="city-name">Seoul</span></div>
+    </header>
+
+    <nav class="monthnav">
+      <button id="prev-month" aria-label="이전 달">‹</button>
+      <h2 id="month-label">—</h2>
+      <button id="next-month" aria-label="다음 달">›</button>
+    </nav>
+
+    <section class="calendar" aria-label="달력">
+      <div class="weekrow head">
+        <span>Su</span><span>Mo</span><span>Tu</span>
+        <span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+      </div>
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <p class="legend">
+      <span class="dot dot-on"></span> 곡 있음
+      <span class="dot dot-off"></span> 아직 없음
+    </p>
+  </main>
+
+  <!-- ── detail modal ────────────────────────────────────────── -->
+  <aside id="detail" class="detail" hidden aria-hidden="true">
+    <div class="detail-inner">
+      <button id="detail-close" class="close" aria-label="닫기">✕</button>
+      <header class="detail-head">
+        <h3 id="detail-date">—</h3>
+        <p id="detail-meta" class="muted">—</p>
+      </header>
+
+      <figure class="score">
+        <img id="detail-score" alt="악보" hidden>
+        <p id="detail-score-empty" class="empty muted">악보 준비 중</p>
+      </figure>
+
+      <div class="player">
+        <div class="variant-toggle" role="tablist">
+          <button data-variant="short" class="active">1분</button>
+          <button data-variant="long">2분+</button>
+        </div>
+        <audio id="detail-audio" controls preload="none"></audio>
+      </div>
+
+      <dl id="detail-weather" class="weather"></dl>
+
+      <ul class="downloads" id="detail-downloads"></ul>
+    </div>
+  </aside>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

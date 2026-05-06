@@ -218,3 +218,67 @@ generator_ver 를 별도로 기록.
 2. Storage 버킷 `busy-day-archive` (public read) 생성
 3. `seoul` 도시 row 1개 시드(insert)
 4. KMA 어댑터 + cron(Edge Function `/daily-compose`) 작성
+
+---
+
+## 5. 정적 페이지(`index.html`) 배포 — GitHub Pages
+
+빌드 단계 없는 순수 정적 파일이라 main 브랜치 root 를 GH Pages 소스로 지정하면
+바로 동작합니다.
+
+### 5.1 배포 절차
+
+1. 리포지토리 Settings → Pages
+2. Source: `Deploy from a branch`
+3. Branch: `main` / folder `/ (root)`
+4. Save → 1~2분 후 `https://<owner>.github.io/busy-day/` 로 접속
+
+> 필요시 `CNAME` 파일을 root 에 추가하면 커스텀 도메인 사용 가능.
+
+### 5.2 비밀번호 설정 (단일 사용자 게이트)
+
+`js/config.js` 의 `PASSWORD_HASH` 에 sha-256 hex 다이제스트를 넣습니다.
+빈 문자열로 두면 게이트 없이 누구나 접속 가능.
+
+로컬에서 해시 만드는 법:
+```bash
+echo -n "내가-원하는-비밀번호" | shasum -a 256 | cut -d' ' -f1
+```
+
+생성된 64자리 hex 를 `PASSWORD_HASH` 값으로 붙여넣고 커밋. 이 해시가
+공개되더라도 비밀번호가 길면(>= 12자, 무작위) 역산 비용이 큼.
+
+### 5.3 파일 구조
+
+```
+busy-day/
+├── index.html           — 게이트 + 달력 + 디테일 모달 셸
+├── styles.css           — 무지미 스타일 1장
+└── js/
+    ├── config.js        — Supabase URL/key, PASSWORD_HASH
+    ├── auth.js          — sha-256 게이트
+    ├── api.js           — Supabase 클라이언트 + 월간 곡 조회
+    ├── calendar.js      — 6주 그리드 렌더
+    ├── player.js        — 디테일 모달 (악보·오디오·다운로드)
+    └── main.js          — 부트
+```
+
+모든 의존성은 ESM CDN(`esm.sh`) 으로 동적 로드 — 노드/번들러 없음.
+
+### 5.4 동작 흐름
+
+```
+페이지 로드
+  → auth.bindGate() 가 sessionStorage 확인
+  → 통과 시 main.boot() 호출
+  → CalendarView.render() : 현재 월의 songs 행 fetch
+  → 각 셀: 곡 있으면 .has-song + 장르 라벨, 클릭 시 DetailPanel.open()
+  → 모달:
+      - score.jpg public URL 표시
+      - 1분/2분+ 토글로 mp3_short/mp3_long URL 스왑
+      - 다운로드 리스트 (mp3/wav/jpg/musicxml/midi 중 존재하는 것)
+      - 재생 시작 시 plays 테이블에 비동기 insert
+```
+
+곡 데이터가 아직 없으면 모든 셀이 빈 칸 — DB·작곡 파이프라인 연결 후 자동
+표출.
