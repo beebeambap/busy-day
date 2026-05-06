@@ -295,20 +295,257 @@ def compose_today(city: str, date: date) -> Composition:
 
 ---
 
-## 9. 단계별 마일스톤
+## 9. 곡 길이 & 형식 권장값
 
-1. **MVP-0** : 임의 날씨 → MIDI 1곡(Ionian/Dorian만), 콘솔 CLI
-2. **MVP-1** : 실제 OpenWeather 연동 + 4가지 모드 + soundfont 렌더 → mp3
-3. **MVP-2** : 폼/아르페지오/텍스처 레이어, 휴머나이즈, LUFS 정규화
-4. **v1.0**  : 웹 플레이어(Tone.js), 도시 선택, 매일 자동 갱신, 곡 아카이브
-5. **v1.1**  : 감성 회귀 테스트 + 사용자 좋아요 기반 가중치 학습(수동 라벨)
-6. **v2.0**  : 공간 오디오(바이노럴), iOS/안드로이드 위젯
+레퍼런스 분석(Muji BGM 컴필 평균 ~3'10", Various Artists "Busy Day" 류 평균 ~2'40")과
+배경음악 사용 상황(아침 루틴, 카페 1잔, 산책 1바퀴)을 함께 고려한 권장값:
+
+| 사용 시나리오 | 길이 | 비고 |
+|---|---|---|
+| 데일리 단곡(기본) | **2:30 – 3:30** | 권장 기본 = **3:00**. 커피 한 잔 정도 |
+| 짧은 프리뷰(달력 셀 호버) | 0:20 – 0:30 | A 섹션 첫 8마디 루프 |
+| 위젯/알림 | 0:45 – 1:00 | INTRO + A 8마디 |
+| 한 달 합본(monthly mix) | 30 – 45분 | 날짜순 크로스페이드 4초 |
+| 한 해 합본(yearly tape) | 4 × 30분 (계절별 EP) | 365곡 전부가 아니라 큐레이션 |
+
+길이 산정 공식 (BPM에 따른 자동 보정):
+```
+total_bars = round(target_seconds * bpm / 240)     # 4/4 기준
+target_seconds = clamp(180 ± 30 * (1 - calmness), 150, 210)
+```
+즉 차분한 날일수록 3'30"에 가깝고, 활동적인 날(맑고 바람 약간)은 2'30"에 가깝게.
+
+섹션 비율 (총 64마디 = 약 3분 @ 72bpm 기준):
+```
+INTRO  8 bars (12.5%)   여백, 텍스처만
+A     16 bars (25%)     주제 제시
+B     16 bars (25%)     변주 / 카운터멜로디
+A'    16 bars (25%)     축약 회귀
+OUTRO  8 bars (12.5%)   페이드, 여운
+```
 
 ---
 
-## 10. 열린 결정사항
+## 10. 달력 UI & 악보 뷰어
+
+### 10.1 화면 구성
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  busy-day            Seoul ▾            2026 / 05       │
+├─────────────────────────────────────────────────────────┤
+│   M    T    W    T    F    S    S                       │
+│   ─    ─    ─    1    2    3    4                       │
+│   5    6●   7    8    9   10   11    ●= 오늘            │
+│  12   13   14   15   16   17   18    ○= 듣기 완료       │
+│  19   20   21   22   23   24   25    · = 미생성         │
+│  26   27   28   29   30   31   ─                        │
+│                                                         │
+│  각 셀 호버 → 30초 프리뷰 자동 재생                      │
+│  각 셀 클릭 → 우측에 악보 뷰어 + 플레이어 오픈           │
+├─────────────────────────────────────────────────────────┤
+│   [ 악보 뷰어 패널 — 5월 6일 (수) ]                     │
+│   ♩ = 72   D dorian   3:04                              │
+│   ┌───────────────────────────────────────┐             │
+│   │ ♭♭ 4/4  ♩♩ ♩  ♩ ♩  ♩ ─                │             │
+│   │ ──────●─●─●──●─●──────                │             │
+│   └───────────────────────────────────────┘             │
+│   [▶ 재생]  [⏸]  [━━━●─────] 0:42 / 3:04                │
+│   [ JPG 다운로드 ]  [ MP3 다운로드 ]  [ MIDI ] [ XML ]   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 10.2 클릭 → 악보 표시 흐름
+
+```
+calendar cell click
+  → GET /api/songs/{date}/{city}
+       returns { ir_json_url, musicxml_url, jpg_url, mp3_url, weather }
+  → 프론트 OSMD(OpenSheetMusicDisplay)에 musicxml 로드 → SVG 렌더
+  → 동시에 Tone.js Sampler 가 IR(json)을 큐잉
+  → 사용자가 ▶ 누르면 OSMD 커서가 진행, Tone.js 가 같은 timeline 으로 재생
+```
+
+핵심: 악보의 시각 진행과 오디오는 같은 IR(중간 표현)에서 파생되므로 **동기화가
+보장**됨. OSMD `cursor.next()` 가 매 비트마다 호출되어 현재 음표를 하이라이트.
+
+### 10.3 시스템이 악보를 읽어 재생하는 방식
+
+두 가지 경로 중 **MusicXML 경로**를 권장:
+
+- **A. IR(JSON) 직접 재생** — 백엔드 IR을 Tone.js 가 그대로 읽음. 빠르고 정확.
+- **B. MusicXML 재해석** — 악보(MusicXML)를 진짜로 "읽어서" 재생. 사용자가 악보를
+  편집(미래 기능)했을 때 그 변경이 음에 반영됨.
+
+기본은 A로 빠르게 재생하되, "악보 모드(편집)"에서는 B로 전환해 MusicXML →
+파서(Verovio / `musicxml-parser`) → Tone Part 로 변환.
+
+### 10.4 JPG 익스포트
+```
+MusicXML → Verovio (server-side, headless) → SVG
+        → resvg / sharp 로 PNG 래스터화 (300dpi, A4)
+        → libvips 로 JPG(quality 92) 변환 → S3 업로드
+```
+파일명: `{city}/{YYYY}/{MM}/{YYYY-MM-DD}.jpg` 약 400–800KB.
+
+상단 헤더에 자동 삽입: 곡 제목(`busy-day · 2026.05.06 · Seoul`),
+템포·조성, 그리고 그날의 날씨 아이콘(작게).
+
+### 10.5 MP3 익스포트
+- 매일 배치에서 wav(48k/24bit) 생성 → ffmpeg 으로 mp3 V2(VBR ~190kbps) 인코딩
+- ID3 태그:
+  - title  : `busy-day · 2026-05-06`
+  - artist : `busy-day generator`
+  - album  : `Seoul · 2026-05`
+  - comment: `D dorian, 72bpm, cloudy 70%, 18°C`
+  - artwork: 그날의 악보 JPG 썸네일(512px)
+- "MP3 다운로드" 버튼은 사전 생성된 정적 URL 로 즉시 다운로드(신호 URL, 7일 유효)
+
+### 10.6 악보 표기 규칙 (가독성 우선)
+- 5선 1단(treble) 또는 그랜드 스태프(treble + bass) — 베이스 레이어가 있으면 grand
+- 텍스처(L4 비/룸톤)는 악보에 표기 X — 좌측 하단에 텍스트로 "rain field, room tone"
+- 패드(L1)는 코드 심볼만 표기(`Dm9  Gmaj7  ...`), 모든 보이스를 그리지 않음
+- 멜로디(L2) 1성부 + 베이스(L3) 1성부 = 사람이 연주 가능한 형태로 단순화
+- 다이내믹: `mp` 일관, 페달 표시(Ped. ────)
+
+이 단순화 덕분에 악보는 "이 곡을 사람이 따라 칠 수 있는 lead sheet" 가 되고,
+시스템 재생은 IR 기반의 풀 믹스라는 이중 구조.
+
+---
+
+## 11. 아카이빙 구조
+
+### 11.1 스토리지 레이아웃 (객체 스토리지: S3 / R2)
+
+```
+busy-day-archive/
+├── songs/
+│   └── {city}/                          # ex) seoul, tokyo, busan
+│       └── {YYYY}/
+│           └── {MM}/
+│               └── {YYYY-MM-DD}/
+│                   ├── ir.json          # 중간 표현 (재현 가능 핵심)
+│                   ├── score.musicxml   # 악보 원본
+│                   ├── score.jpg        # 시트 이미지 (300dpi)
+│                   ├── score-thumb.png  # 달력 썸네일 (256px)
+│                   ├── audio.mp3        # 배포용 (~190kbps VBR)
+│                   ├── audio.wav        # 마스터 (30일 후 만료)
+│                   ├── midi.mid         # MIDI 원본
+│                   ├── waveform.json    # 시각화용 PCM 다운샘플
+│                   └── meta.json        # 날씨·시드·품질지표
+├── compilations/
+│   └── {city}/
+│       └── {YYYY}-{MM}.mp3              # 월간 합본(크로스페이드)
+│       └── {YYYY}-{season}.mp3          # 계절 EP
+└── sitemap/
+    └── {city}-{YYYY}.json               # 달력 UI 가 한 번에 받는 인덱스
+```
+
+### 11.2 메타 인덱스 (DB: Postgres)
+
+```sql
+-- 곡 한 곡 = row 하나
+create table songs (
+  id            uuid primary key,
+  city          text not null,
+  date          date not null,
+  seed          bigint not null,
+  key_root      text,           -- 'D'
+  mode          text,           -- 'dorian'
+  bpm           int,
+  duration_sec  int,
+  weather       jsonb,          -- 원본 날씨 스냅샷
+  features      jsonb,          -- 정규화 특징량
+  quality       jsonb,          -- 회귀 테스트 점수
+  paths         jsonb,          -- {ir, musicxml, jpg, mp3, wav, midi}
+  generator_ver text,           -- 'v1.2.0' 재생성 추적
+  created_at    timestamptz default now(),
+  unique(city, date, generator_ver)
+);
+
+create index on songs (city, date desc);
+create index on songs using gin (weather);
+
+-- 사용자 인터랙션
+create table plays (
+  user_id  uuid,
+  song_id  uuid references songs(id),
+  played_at timestamptz default now(),
+  duration_sec int,
+  liked    bool default false
+);
+```
+
+`generator_ver` 키 덕분에 엔진을 개선해도 과거 곡은 그대로 보존되고,
+새 버전은 별도 row 로 누적된다(같은 날·같은 도시에 여러 버전 공존 가능).
+
+### 11.3 보존 정책 (Retention)
+
+| 자산 | 보존 기간 | 사유 |
+|---|---|---|
+| `ir.json`, `meta.json`, `score.musicxml` | **영구** | 가벼움(KB), 곡 재생성 가능 |
+| `midi.mid` | 영구 | 수십 KB |
+| `score.jpg` (300dpi) | 영구 | ~600KB |
+| `audio.mp3` | 영구 | ~5MB |
+| `audio.wav` | **30일** | 30MB · IR로부터 재렌더 가능 |
+| `waveform.json` | 1년 | UI 캐시 용도 |
+| 월간/계절 합본 | 영구 | 큐레이션 자산 |
+
+도시 1개·1년 기준 영구 자산 ≈ `(0.6 + 5 + 0.05) × 365 ≈ 2.1 GB`. 100개 도시면
+연간 ~210 GB(객체 스토리지에서 충분히 합리적).
+
+### 11.4 명명 / 버전 규칙
+- 곡 ID 표기: `busy-day/{city}/{YYYY-MM-DD}@v{generator_ver}` 예) `busy-day/seoul/2026-05-06@v1.2.0`
+- 사용자에게 보이는 제목: `busy-day · 2026.05.06 · Seoul`
+- 공유 URL: `/songs/seoul/2026-05-06` (최신 generator_ver 자동 매핑)
+
+### 11.5 백업
+- 객체 스토리지는 cross-region 복제 1개
+- DB는 매일 dump → 별도 버킷에 14일 보관
+- `ir.json` 만 있으면 audio·jpg 등 모든 파생물 100% 재현되므로, **재해 복구 시
+  최소 복원 단위 = ir.json + 코드 + 샘플팩**
+
+### 11.6 달력 API 응답 예
+```jsonc
+GET /api/calendar?city=seoul&month=2026-05
+{
+  "city": "seoul",
+  "month": "2026-05",
+  "days": [
+    {
+      "date": "2026-05-01",
+      "key": "F",  "mode": "lydian",
+      "bpm": 84,   "duration": 178,
+      "weather_icon": "sun",
+      "preview_mp3": "https://cdn/.../preview.mp3",
+      "thumb": "https://cdn/.../score-thumb.png"
+    },
+    { "date": "2026-05-02", "...": "..." }
+  ]
+}
+```
+달력 진입 시 1회 호출로 한 달치 메타·썸네일을 받고, 클릭 시 비로소 풀
+musicxml/mp3 를 lazy-load.
+
+---
+
+## 12. 단계별 마일스톤 (개정)
+
+1. **MVP-0** : 임의 날씨 → MIDI 1곡(Ionian/Dorian만), 콘솔 CLI
+2. **MVP-1** : 실제 OpenWeather 연동 + 4가지 모드 + soundfont 렌더 → mp3
+3. **MVP-2** : MusicXML 출력 + Verovio JPG 익스포트
+4. **v1.0**  : 웹 달력 UI + OSMD 악보 뷰어 + Tone.js 동기 재생, 도시 선택
+5. **v1.1**  : 아카이브 DB(songs 테이블) + 보존 정책 + 월간 합본 자동 생성
+6. **v1.2**  : 감성 회귀 테스트 + 좋아요 기반 가중치(수동 라벨)
+7. **v2.0**  : 공간 오디오(바이노럴), iOS/안드로이드 위젯, 악보 편집 모드
+
+---
+
+## 13. 열린 결정사항
 
 - 라이선스: 샘플 라이브러리 라이선스(상업 사용 가능 여부) — VSCO2 / Sonatina / 자체 녹음?
-- 저장: 곡당 wav 약 30MB → 도시 100개·1년이면 1TB. mp3만 영구 보관, wav는 30일.
+- DB / 스토리지: Supabase(Postgres + Storage) 단일 스택 vs S3+RDS 분리. Supabase
+  쪽이 MVP 속도에서 유리(이 저장소의 MCP 컨텍스트와도 일치).
 - 학습형 멜로디(Magenta MusicVAE) 도입 여부 — 도입 시 "랜덤성"의 정의가 흔들림.
   현재 설계는 **규칙+의사난수**로만 한정해 재현성·검증성을 우선시.
+- 악보 표기 단순화 수준: 풀 보이싱 vs 리드시트(현재 설계는 리드시트).
