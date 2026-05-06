@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import mido
 
+from .comping import GM_DRUM_NOTE
+
 TICKS_PER_BEAT = 480
+PERC_NOTE_LEN_BEATS = 0.08    # short stab so the drum note doesn't sustain
 
 # General MIDI program numbers (0-indexed) per genre & track
 GM_PROGRAMS = {
@@ -125,5 +128,29 @@ def render_midi(ir: dict, path: str) -> None:
     _flush_track(bas,
                  _events_to_messages(ir["tracks"]["bass"], channel=2, bpb=bpb))
     mid.tracks.append(bas)
+
+    # percussion on GM drum channel 9. No program_change needed; the
+    # GM standard fixes the kit to channel 10 (1-indexed = 9 here).
+    perc_events = ir.get("tracks", {}).get("percussion", [])
+    if perc_events:
+        perc = mido.MidiTrack()
+        perc.append(mido.MetaMessage("track_name", name="percussion", time=0))
+        msgs = []
+        for ev in perc_events:
+            note = GM_DRUM_NOTE.get(ev["kind"])
+            if note is None:
+                continue
+            start_tick = int((ev["bar"] * bpb + ev["start_beat"])
+                             * TICKS_PER_BEAT)
+            end_tick   = int(start_tick + PERC_NOTE_LEN_BEATS * TICKS_PER_BEAT)
+            vel = max(1, min(127, int(ev.get("vel", 64))))
+            msgs.append((start_tick,
+                         mido.Message("note_on", channel=9,
+                                      note=note, velocity=vel)))
+            msgs.append((end_tick,
+                         mido.Message("note_off", channel=9,
+                                      note=note, velocity=0)))
+        _flush_track(perc, msgs)
+        mid.tracks.append(perc)
 
     mid.save(path)

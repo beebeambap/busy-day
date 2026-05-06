@@ -169,7 +169,99 @@ function makeStringPad(volume) {
   });
 }
 
-const _instruments = new Map(); // cache key -> { melody, harmony, bass, ready }
+// ── percussion rack ────────────────────────────────────────────
+//
+// Returns an object with .trigger(kind, time, velocity). Each voice
+// is intentionally low-volume — percussion is rhythmic skeleton, not
+// a featured layer. Routed dry (no reverb) so the pulse stays crisp.
+
+function makePercussion() {
+  const out = new Tone.Gain(0.85).toDestination();
+
+  const tap = new Tone.MembraneSynth({
+    pitchDecay: 0.005,
+    octaves: 1.5,
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.001, decay: 0.10, sustain: 0, release: 0.08 },
+    volume: -14,
+  }).connect(out);
+
+  const shaker = new Tone.NoiseSynth({
+    noise:    { type: "white" },
+    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
+    volume: -22,
+  }).connect(out);
+
+  const brush = new Tone.NoiseSynth({
+    noise:    { type: "pink" },
+    envelope: { attack: 0.005, decay: 0.18, sustain: 0, release: 0.06 },
+    volume: -20,
+  }).connect(out);
+
+  const ride = new Tone.MetalSynth({
+    frequency: 250,
+    harmonicity: 4.1,
+    modulationIndex: 12,
+    resonance: 4000,
+    octaves: 1,
+    envelope: { attack: 0.001, decay: 0.4, release: 0.3 },
+    volume: -34,
+  }).connect(out);
+
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.04,
+    octaves: 6,
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 1.2 },
+    volume: -10,
+  }).connect(out);
+
+  const snare = new Tone.NoiseSynth({
+    noise:    { type: "white" },
+    envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.08 },
+    volume: -16,
+  }).connect(out);
+
+  const hat = new Tone.MetalSynth({
+    frequency: 200,
+    harmonicity: 5.1,
+    modulationIndex: 20,
+    resonance: 4000,
+    octaves: 1.5,
+    envelope: { attack: 0.001, decay: 0.05, release: 0.02 },
+    volume: -32,
+  }).connect(out);
+
+  return {
+    trigger(kind, time, velocity = 0.7) {
+      switch (kind) {
+        case "tap":
+          tap.triggerAttackRelease("C3", "32n", time, velocity);
+          break;
+        case "shaker":
+          shaker.triggerAttackRelease("32n", time, velocity);
+          break;
+        case "brush":
+          brush.triggerAttackRelease("16n", time, velocity * 0.85);
+          break;
+        case "ride":
+          ride.triggerAttackRelease("32n", time, velocity * 0.8);
+          break;
+        case "kick":
+          kick.triggerAttackRelease("C1", "8n", time, velocity);
+          break;
+        case "snare":
+          snare.triggerAttackRelease("16n", time, velocity);
+          break;
+        case "hat":
+          hat.triggerAttackRelease("32n", time, velocity * 0.7);
+          break;
+      }
+    },
+  };
+}
+
+const _instruments = new Map(); // cache key -> { melody, harmony, bass, percussion, ready }
 
 function buildInstruments(genre, instrumentId) {
   const reverb = new Tone.Reverb({ decay: 3.6, wet: 0.34 }).toDestination();
@@ -218,7 +310,9 @@ function buildInstruments(genre, instrumentId) {
     if (instrumentId === "piano") ready.push(Tone.loaded());
   }
 
-  const entry = { melody, harmony, bass, ready: Promise.all(ready) };
+  const percussion = makePercussion();
+
+  const entry = { melody, harmony, bass, percussion, ready: Promise.all(ready) };
   return entry;
 }
 
@@ -446,7 +540,8 @@ export class DetailPanel {
 
     const genre = this.song?.genre || "ambient";
     const instrumentId = this.song?.instrument_id || null;
-    const { melody, harmony, bass } = await getInstruments(genre, instrumentId);
+    const { melody, harmony, bass, percussion } =
+      await getInstruments(genre, instrumentId);
 
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
@@ -454,6 +549,24 @@ export class DetailPanel {
     const t0 = 0.05;
     this.midi.tracks.forEach((track) => {
       const name = (track.name || "").toLowerCase();
+      const isDrum = (track.channel === 9) || name.includes("percussion");
+
+      if (isDrum) {
+        // GM percussion (channel 9). Look up our internal kind by note.
+        const NOTE_TO_KIND = {
+          75: "tap", 70: "shaker", 39: "brush", 51: "ride",
+          36: "kick", 38: "snare", 42: "hat",
+        };
+        track.notes.forEach((note) => {
+          const kind = NOTE_TO_KIND[note.midi];
+          if (!kind) return;
+          Tone.Transport.schedule((time) => {
+            percussion.trigger(kind, time, note.velocity * 0.95);
+          }, t0 + note.time);
+        });
+        return;
+      }
+
       let inst;
       if (name.includes("harmony"))   inst = harmony;
       else if (name.includes("bass")) inst = bass;

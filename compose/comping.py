@@ -274,3 +274,138 @@ def bass_pitch(degree_to_midi_fn, key, mode, chord_root, kind: str) -> int:
                                  octave_shift=0,  base_octave=3)
     return degree_to_midi_fn(key, mode, chord_root,
                              octave_shift=-1, base_octave=2)
+
+
+# ── percussion patterns ────────────────────────────────────────────
+#
+# Each event: (start_beat, kind, vel_mult). `kind` is one of:
+#   "tap"     — soft wood click (metronome-ish)
+#   "shaker"  — short white-noise burst
+#   "brush"   — pink-noise brush sweep
+#   "ride"    — metallic bell ping
+#   "kick"    — low membrane thump
+#   "snare"   — mid white-noise crack
+#   "hat"     — high metallic tick
+#
+# These are tuned for "박자감 without drums" — the percussive layer is
+# always under the harmony comping in volume.
+
+_P44 = {
+    "ambient":      [],
+    "neo_classical": [
+        (0.0, "tap",    0.55),
+        (2.0, "tap",    0.45),
+    ],
+    "folk": [
+        (0.0, "tap",    0.50),
+        (1.0, "brush",  0.65),    # backbeat
+        (2.0, "tap",    0.45),
+        (3.0, "brush",  0.65),
+    ],
+    "bossa_nova": [
+        (0.0, "shaker", 0.55),
+        (0.5, "shaker", 0.40),
+        (1.0, "shaker", 0.55),
+        (1.5, "shaker", 0.40),
+        (2.0, "shaker", 0.55),
+        (2.5, "shaker", 0.40),
+        (3.0, "shaker", 0.55),
+        (3.5, "shaker", 0.40),
+    ],
+    "jazz_ballad": [
+        (0.0, "ride",   0.40),
+        (1.0, "brush",  0.55),    # backbeat
+        (1.5, "ride",   0.30),
+        (2.0, "ride",   0.40),
+        (2.5, "ride",   0.30),
+        (3.0, "brush",  0.55),
+        (3.5, "ride",   0.30),
+    ],
+    "lo_fi": [
+        (0.0, "kick",   0.75),
+        (0.5, "hat",    0.30),
+        (1.0, "hat",    0.30),
+        (1.5, "hat",    0.30),
+        (2.0, "snare",  0.65),
+        (2.5, "hat",    0.30),
+        (3.0, "hat",    0.30),
+        (3.5, "hat",    0.30),
+    ],
+}
+
+_P34 = {
+    "ambient":      [],
+    "neo_classical": [(0.0, "tap", 0.55)],
+    "folk": [
+        (0.0, "tap",    0.55),    # waltz down-beat
+        (1.0, "brush",  0.55),
+        (2.0, "brush",  0.55),
+    ],
+    "bossa_nova": [
+        (0.0, "shaker", 0.55),
+        (0.5, "shaker", 0.40),
+        (1.0, "shaker", 0.50),
+        (1.5, "shaker", 0.40),
+        (2.0, "shaker", 0.50),
+        (2.5, "shaker", 0.40),
+    ],
+    "jazz_ballad": [
+        (0.0, "ride",   0.40),
+        (1.0, "brush",  0.55),
+        (2.0, "ride",   0.40),
+    ],
+    "lo_fi": [
+        (0.0, "kick",   0.70),
+        (1.0, "snare",  0.55),
+        (2.0, "snare",  0.55),
+    ],
+}
+
+_P68 = {
+    "ambient":      [],
+    "neo_classical": [
+        (0.0, "tap",    0.55),
+        (3.0, "tap",    0.45),
+    ],
+    "folk": [
+        (0.0, "tap",    0.55),
+        (3.0, "brush",  0.60),
+    ],
+    "bossa_nova": [
+        (0.0, "shaker", 0.55),
+        (1.0, "shaker", 0.40),
+        (2.0, "shaker", 0.40),
+        (3.0, "shaker", 0.55),
+        (4.0, "shaker", 0.40),
+        (5.0, "shaker", 0.40),
+    ],
+    "jazz_ballad": [
+        (0.0, "ride",   0.40),
+        (3.0, "ride",   0.40),
+        (1.5, "brush",  0.45),
+        (4.5, "brush",  0.45),
+    ],
+    "lo_fi": [
+        (0.0, "kick",   0.70),
+        (3.0, "snare",  0.55),
+    ],
+}
+
+
+def percussion_pattern(genre: str, meter: str):
+    bpb = int(meter.split("/")[0])
+    table = {3: _P34, 4: _P44, 6: _P68}.get(bpb, _P44)
+    return table.get(genre, [])
+
+
+# General MIDI drum notes (channel 9). Used by render.py to give the
+# downloaded MIDI a sensible drum kit when opened in a DAW.
+GM_DRUM_NOTE = {
+    "tap":    75,   # claves
+    "shaker": 70,
+    "brush":  39,   # hand clap (closest soft attack)
+    "ride":   51,
+    "kick":   36,
+    "snare":  38,
+    "hat":    42,
+}

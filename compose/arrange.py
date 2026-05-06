@@ -26,6 +26,7 @@ from .comping import (
     bass_pitch as _bass_pitch,
     chord_subset,
     harmony_pattern,
+    percussion_pattern,
 )
 from .features import Features
 from .harmony import progression, voicing_for_genre
@@ -124,6 +125,7 @@ def compose_ir(
     melody_events = []
     harmony_events = []
     bass_events = []
+    percussion_events = []
 
     last_bar_idx = len(chord_seq) - 1
     cur_bar = 0
@@ -221,6 +223,27 @@ def compose_ir(
                     "vel": max(30, min(85, vel)),
                 })
 
+        # ── percussion: defines the pulse so the listener can feel
+        #    time even when chord changes are slow. Stays silent in
+        #    INTRO[0], OUTRO, and entirely for ambient.
+        if not is_final and not (section == "INTRO" and bar_idx == 0):
+            for off, kind, vel_mult in percussion_pattern(genre, meter):
+                # fade percussion in over the INTRO and out over the OUTRO
+                fade = 1.0
+                if section == "INTRO":
+                    fade = 0.55
+                elif section == "OUTRO":
+                    fade = 0.6
+                vel = int(round(70 * vel_mult * fade
+                                + rng.uniform(-2, 2)))
+                vel = max(20, min(100, vel))
+                percussion_events.append({
+                    "bar": cur_bar,
+                    "start_beat": round(off, 4),
+                    "kind": kind,
+                    "vel": vel,
+                })
+
         cur_bar += 1
 
     # ── humanization passes (deterministic via salted RNG) ──────────
@@ -280,9 +303,10 @@ def compose_ir(
         "section_bars": sec_len,
         "bars": bars_meta,
         "tracks": {
-            "melody":  melody_events,
-            "harmony": harmony_events,
-            "bass":    bass_events,
+            "melody":     melody_events,
+            "harmony":    harmony_events,
+            "bass":       bass_events,
+            "percussion": percussion_events,
         },
         "pedals": pedals,
         "signature": signature,
