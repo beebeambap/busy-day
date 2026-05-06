@@ -13,11 +13,11 @@ const WEATHER_LABELS = {
 };
 
 const DOWNLOAD_KEYS = [
-  ["mid_short", "MIDI 1분"],
-  ["mid_long",  "MIDI 2분+"],
-  ["svg",       "악보 SVG"],
-  ["musicxml",  "MusicXML"],
-  ["ir_short",  "IR (json)"],
+  ["mid_short", "MIDI 1분",   "short.mid"],
+  ["mid_long",  "MIDI 2분+",  "long.mid"],
+  ["svg",       "악보 SVG",   "score.svg"],
+  ["musicxml",  "MusicXML",   "score.musicxml"],
+  ["ir_short",  "IR (json)",  "ir-short.json"],
 ];
 
 // Salamander grand piano (Tone.js reference dataset, ~6 MB total).
@@ -156,6 +156,46 @@ async function getInstruments(genre) {
   const cached = _instruments.get(genre) || buildInstruments(genre);
   await cached.ready;
   return cached;
+}
+
+// ── filename builder ─────────────────────────────────────────────
+// Examples:
+//   busy-day_2026-05-06_seoul_18C-clear_D-lydian_ambient_short.mid
+//   busy-day_2026-05-06_seoul_12C-rain_E-dorian_lo-fi_score.svg
+
+function _weatherTag(w) {
+  if (!w) return "";
+  const tempC = w.temp_c != null ? `${Math.round(Number(w.temp_c))}C` : "";
+  const cloud = Number(w.cloud_pct ?? 50);
+  const sky =
+    w.precip_type === "rain"      ? "rain"
+    : w.precip_type === "snow"      ? "snow"
+    : w.precip_type === "rain_snow" ? "sleet"
+    : w.precip_type === "shower"    ? "shower"
+    : cloud >= 80 ? "overcast"
+    : cloud >= 40 ? "cloudy"
+    : "clear";
+  return [tempC, sky].filter(Boolean).join("-");
+}
+
+function _slug(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .replace(/[^a-z0-9-]+/g, "")
+    .replace(/^-+|-+$/g, "");
+}
+
+function buildDownloadName(song, suffix) {
+  const date = song.date || "song";
+  const city = _slug(song.city_id) || "song";
+  const weather = _weatherTag(song.weather);
+  const keyMode = [song.key_root, song.mode]
+    .filter(Boolean).map(_slug).join("-");
+  const genre = _slug(song.genre);
+  const parts = ["busy-day", date, city, weather, keyMode, genre]
+    .filter((p) => p && p.length);
+  return `${parts.join("_")}_${suffix}`;
 }
 
 function fmtTime(sec) {
@@ -374,14 +414,14 @@ export class DetailPanel {
 
   renderDownloads(paths) {
     this.downloadsEl.innerHTML = "";
-    if (!paths) return;
-    for (const [key, label] of DOWNLOAD_KEYS) {
+    if (!paths || !this.song) return;
+    for (const [key, label, suffix] of DOWNLOAD_KEYS) {
       const url = publicUrl(paths[key]);
       if (!url) continue;
       const li = document.createElement("li");
       const a = document.createElement("a");
       a.href = url;
-      a.download = "";
+      a.download = buildDownloadName(this.song, suffix);
       a.textContent = label;
       li.appendChild(a);
       this.downloadsEl.appendChild(li);
