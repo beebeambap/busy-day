@@ -7,6 +7,12 @@ dist/
 build/
 .cache/
 
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
 # generated assets
 out/
 renders/

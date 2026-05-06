@@ -211,13 +211,46 @@ generator_ver 를 별도로 기록.
 
 ---
 
-## 4. 다음 액션
+## 4. 작곡 코어 — 페이즈 진행 상황
 
-1. Supabase 신규 Free 프로젝트 `busy-day` 생성 결정 → 확정 시 `apply_migration`
-   으로 `supabase/migrations/20260506000001_init_songs.sql` 실행
-2. Storage 버킷 `busy-day-archive` (public read) 생성
-3. `seoul` 도시 row 1개 시드(insert)
-4. KMA 어댑터 + cron(Edge Function `/daily-compose`) 작성
+### Phase 1 (완료) — 룰 기반 결정적 작곡 → MIDI
+
+```
+python -m compose generate --date 2026-05-06 --city seoul \
+    --preset seoul-mild-clear --out ./out
+```
+
+산출: `out/ir.json` + `out/audio.mid`. 의존성: `mido`만.
+
+구성:
+- `compose/seed.py` — sha256 기반 결정적 시드
+- `compose/features.py` — 날씨 → {warmth, brightness, wetness, calmness}
+- `compose/mapping.py` — features → 모드/조성/장르/BPM/박자/모티브
+- `compose/scales.py` — 모드 인터벌, degree → MIDI 변환
+- `compose/harmony.py` — 모드별 마르코프 화성 진행
+- `compose/melody.py` — 모티브 변주 8종 (역행/축소/확대/이조/장식/생략/에코/원형)
+- `compose/arrange.py` — 5섹션 형식(INTRO/A/B/A'/OUTRO), 길이 ~62초 자동 산정
+- `compose/render.py` — IR → 표준 MIDI (3트랙: melody/harmony/bass, GM 음색)
+- `compose/data/motifs.json` — 사람이 그린 시드 모티브 8개
+- `compose/__main__.py` — CLI
+
+검증: 7일치 생성 결과 모두 모드/조성/장르/BPM/박자/모티브/시그니처 유니크,
+~60초 길이 안정.
+
+### Phase 2 — 오디오 + 악보 렌더 (미착수)
+
+1. `music21` 로 IR → MusicXML
+2. Verovio CLI 로 MusicXML → SVG → PNG → JPG (Pillow)
+3. FluidSynth + 사운드폰트로 MIDI → WAV (1분, 2분+ 두 길이)
+4. ffmpeg 으로 WAV → MP3
+5. 결과물: ir.json, musicxml, score.jpg, audio_short.mp3, audio_long.mp3,
+   audio_short.wav, audio_long.wav, audio.mid
+
+### Phase 3 — KMA 실연동 + Supabase 업로드/DB insert
+
+### Phase 4 — GitHub Actions cron
+
+### Phase 5 — Edge Function 수동 트리거 + 웹 UI 버튼
 
 ---
 
