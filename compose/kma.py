@@ -48,19 +48,41 @@ def _precip_type(code: str | int) -> str:
 
 def _aggregate(items: list[dict], target_date: str) -> dict:
     """Reduce hourly forecasts (a list of category-typed records) to a
-    single daily summary that compose.features expects."""
-    by_hour: dict[str, dict[str, Any]] = {}
+    single daily summary that compose.features expects.
+
+    KMA's short-term forecast only covers ~3 days into the future. If
+    `target_date` is older than the forecast window the response will
+    have no rows for it, but it *will* have rows for the days the API
+    can see. In that case we fall back to the closest available date
+    and flag the result with `fallback=true` so the caller knows the
+    weather is approximate.
+    """
+    # Group raw items by fcstDate -> fcstTime -> category
+    by_date: dict[str, dict[str, dict[str, Any]]] = {}
     for it in items:
-        if it["fcstDate"] != target_date:
-            continue
-        h = it["fcstTime"]
-        bucket = by_hour.setdefault(h, {})
-        bucket[it["category"]] = it["fcstValue"]
+        d = it["fcstDate"]
+        by_date.setdefault(d, {}) \
+              .setdefault(it["fcstTime"], {})[it["category"]] = it["fcstValue"]
 
-    if not by_hour:
-        raise RuntimeError(f"KMA returned no rows for {target_date}")
+    if not by_date:
+        raise RuntimeError("KMA returned no forecast rows at all")
 
-    hours = sorted(by_hour.values(), key=lambda h: h.get("__h", 0))
+    if target_date in by_date:
+        used_date = target_date
+        fallback = False
+    else:
+        # Pick whichever date in the response is numerically closest to
+        # the request. For a request 3 days in the past, this picks the
+        # earliest forecast day, which is the closest weather we have.
+        try:
+            tgt_int = int(target_date)
+            used_date = min(by_date.keys(),
+                            key=lambda d: abs(int(d) - tgt_int))
+        except ValueError:
+            used_date = sorted(by_date.keys())[0]
+        fallback = True
+
+    by_hour = by_date[used_date]
     temps = [float(h["TMP"]) for h in by_hour.values() if "TMP" in h]
     rehs  = [float(h["REH"]) for h in by_hour.values() if "REH" in h]
     wsds  = [float(h["WSD"]) for h in by_hour.values() if "WSD" in h]
@@ -83,7 +105,7 @@ def _aggregate(items: list[dict], target_date: str) -> dict:
             except (ValueError, AttributeError):
                 pcps.append(0.0)
 
-    return {
+    out = {
         "temp_c":      round(statistics.mean(temps), 1) if temps else 15.0,
         "temp_range":  round(max(temps) - min(temps), 1) if temps else 8.0,
         "humidity":    round(statistics.mean(rehs), 1) if rehs else 60.0,
@@ -91,9 +113,17 @@ def _aggregate(items: list[dict], target_date: str) -> dict:
         "wind_mps":    round(statistics.mean(wsds), 1) if wsds else 2.0,
         "cloud_pct":   round(statistics.mean(skys) / 4.0 * 100.0, 1) if skys else 50.0,
         "precip_type": _precip_type(max(ptys) if ptys else 0),
-        "source":      "kma",
-        "base_date":   target_date,
+        "source":         "kma",
+        "base_date":      used_date,
+        "requested_date": target_date,
     }
+    if fallback:
+        out["fallback"] = True
+        out["fallback_reason"] = (
+            f"KMA forecast had no rows for {target_date}; "
+            f"used closest available date {used_date}"
+        )
+    return out
 
 
 def fetch_daily(
