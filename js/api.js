@@ -80,7 +80,9 @@ export async function findVariant(cityId, dateIso, variantId) {
   return (data && data[0]) || null;
 }
 
-export async function triggerCompose({ city, date, intent_id, instrument_id }) {
+export async function triggerCompose(
+  { city, date, intent_id, genre_id, instrument_id },
+) {
   const url = `${SUPABASE_URL}/functions/v1/trigger`;
   const r = await fetch(url, {
     method: "POST",
@@ -89,7 +91,7 @@ export async function triggerCompose({ city, date, intent_id, instrument_id }) {
       "apikey":         SUPABASE_PUBLISHABLE_KEY,
       "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ city, date, intent_id, instrument_id }),
+    body: JSON.stringify({ city, date, intent_id, genre_id, instrument_id }),
   });
   const text = await r.text();
   let body;

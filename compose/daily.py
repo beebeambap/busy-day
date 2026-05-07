@@ -135,6 +135,7 @@ def cmd_daily(args: argparse.Namespace) -> int:
             avoid_genres=memory["avoid_genres"],
             avoid_motifs=avoid_motifs,
             intent=intent,
+            force_genre=args.force_genre,
             seed_salt=seed_salt + ("retry:%d|" % attempt if attempt else ""),
         )
         if ir_short["signature"] not in memory["signatures"]:
@@ -238,6 +239,10 @@ def register(sub: argparse._SubParsersAction) -> None:
                    help="intent preset id (calm/warm/wistful/lively/"
                         "after_rain/sleep)")
     p.add_argument("--instrument",
-                   help="melody instrument id (piano/rhodes/nylon/strings/"
-                        "music_box/horn). Default: genre decides.")
+                   help="melody instrument id (piano/rhodes/nylon/violin/"
+                        "viola/cello/strings/music_box/horn). "
+                        "Default: genre decides.")
+    p.add_argument("--force-genre", dest="force_genre",
+                   help="hard-pin genre (ambient/bossa_nova/jazz_ballad/"
+                        "lo_fi/neo_classical/folk). Default: weather decides.")
     p.set_defaults(func=cmd_daily)

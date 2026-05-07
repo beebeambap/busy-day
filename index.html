@@ -32,6 +32,21 @@
       <button id="next-month" aria-label="다음 달">›</button>
     </nav>
 
+    <div class="filterbar" aria-label="날씨 필터">
+      <label for="weather-filter">날씨</label>
+      <select id="weather-filter">
+        <option value="">전체</option>
+        <option value="clear">맑음</option>
+        <option value="cloudy">흐림</option>
+        <option value="rain">비</option>
+        <option value="snow">눈</option>
+        <option value="windy">바람</option>
+        <option value="cold">추운 날</option>
+        <option value="hot">더운 날</option>
+        <option value="humid">습한 날</option>
+      </select>
+    </div>
+
     <section class="calendar" aria-label="달력">
       <div class="weekrow head">
         <span>Su</span><span>Mo</span><span>Tu</span>
@@ -56,11 +71,11 @@
       <button id="intent-close" class="close" aria-label="닫기">✕</button>
       <h3>어떤 곡으로 듣고 싶나요?</h3>
 
-      <p class="section-label">무드</p>
+      <p class="section-label">무드 · 상황</p>
       <div class="intents" id="intent-grid"></div>
 
-      <p class="section-label">시간 · 상황</p>
-      <div class="intents" id="situation-grid"></div>
+      <p class="section-label">장르</p>
+      <div class="intents" id="genre-grid"></div>
 
       <p class="section-label">사운드</p>
       <div class="intents instruments" id="instrument-grid"></div>
@@ -68,12 +83,16 @@
       <div class="modal-actions">
         <button id="intent-submit" type="button" class="primary" disabled>곡 만들기</button>
       </div>
+    </div>
+  </aside>
 
-      <div id="intent-progress" class="intent-progress" hidden>
-        <p id="intent-status" class="muted small">곡을 빚는 중…</p>
-        <progress id="intent-bar" max="100" value="0"></progress>
-        <p id="intent-eta" class="muted small">—</p>
-      </div>
+  <!-- ── compose progress popup (floats over intent modal) ───── -->
+  <aside id="progress-modal" class="progress-modal" hidden aria-hidden="true">
+    <div class="progress-card">
+      <h3>곡을 빚는 중</h3>
+      <progress id="prog-bar" max="100" value="0"></progress>
+      <p id="prog-eta" class="muted small">—</p>
+      <p id="prog-status" class="muted small">워크플로 호출 중…</p>
     </div>
   </aside>
 

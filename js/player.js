@@ -68,18 +68,70 @@ function makeNylon(volume) {
   });
 }
 
-function makeStrings(volume) {
-  // Bowed-string approximation — slow attack, sustained body
-  return new Tone.PolySynth(Tone.AMSynth, {
-    harmonicity: 1,
-    oscillator: { type: "sawtooth4" },
-    envelope:   { attack: 0.5, decay: 0.3, sustain: 0.85, release: 1.6 },
-    modulation: { type: "sine" },
+function _bowedStringSynth({ harmonicity, attack, sustain, release,
+                              modAttack, modDecay, modSustain, modRelease,
+                              volume, vibratoFreq, vibratoDepth }) {
+  // Common bowed-string body: AMSynth voice with sawtooth carrier,
+  // plus a master-rate vibrato LFO modulating detune for the breathing
+  // characteristic of real strings.
+  const synth = new Tone.PolySynth(Tone.AMSynth, {
+    harmonicity,
+    envelope: { attack, decay: 0.3, sustain, release },
     modulationEnvelope: {
-      attack: 0.4, decay: 0.2, sustain: 0.7, release: 1.0,
+      attack: modAttack, decay: modDecay,
+      sustain: modSustain, release: modRelease,
     },
+  });
+  synth.volume.value = volume;
+  if (vibratoFreq && vibratoDepth) {
+    const vib = new Tone.LFO({
+      frequency: vibratoFreq,
+      type: "sine",
+      min: -vibratoDepth,
+      max: +vibratoDepth,
+    }).start();
+    vib.connect(synth.detune);
+  }
+  return synth;
+}
+
+function makeViolin(volume) {
+  // Bright, fast vibrato. Sits one octave above viola.
+  return _bowedStringSynth({
+    harmonicity: 2,
+    attack: 0.18, sustain: 0.85, release: 1.0,
+    modAttack: 0.2, modDecay: 0.2, modSustain: 0.7, modRelease: 0.8,
+    vibratoFreq: 5.5, vibratoDepth: 8,   // ±8 cents
     volume,
   });
+}
+
+function makeViola(volume) {
+  // Warmer mid-range body, mellower vibrato.
+  return _bowedStringSynth({
+    harmonicity: 1.5,
+    attack: 0.30, sustain: 0.85, release: 1.4,
+    modAttack: 0.3, modDecay: 0.2, modSustain: 0.7, modRelease: 1.0,
+    vibratoFreq: 4.5, vibratoDepth: 6,
+    volume,
+  });
+}
+
+function makeCello(volume) {
+  // Deep, slow bow, generous resonance.
+  return _bowedStringSynth({
+    harmonicity: 1,
+    attack: 0.45, sustain: 0.85, release: 1.8,
+    modAttack: 0.4, modDecay: 0.3, modSustain: 0.7, modRelease: 1.4,
+    vibratoFreq: 3.5, vibratoDepth: 5,
+    volume,
+  });
+}
+
+// Backward-compatible: existing rows with instrument_id="strings" still
+// resolve through this. New rows use violin/viola/cello.
+function makeStrings(volume) {
+  return makeViola(volume);
 }
 
 function makeMusicBox(volume) {
@@ -122,11 +174,14 @@ function makeHorn(volume) {
 // changes have bitten us before. Be explicit.
 const INSTRUMENT_FACTORIES = {
   piano:     (reverb) => { const s = makePiano(2.4, -4); s.connect(reverb); return s; },
-  rhodes:    (reverb) => { const s = makeRhodes(-10);     s.connect(reverb); return s; },
-  nylon:     (reverb) => { const s = makeNylon(-8);       s.connect(reverb); return s; },
-  strings:   (reverb) => { const s = makeStrings(-10);    s.connect(reverb); return s; },
-  music_box: (reverb) => { const s = makeMusicBox(-4);    s.connect(reverb); return s; },
-  horn:      (reverb) => { const s = makeHorn(-10);       s.connect(reverb); return s; },
+  rhodes:    (reverb) => { const s = makeRhodes(-10);    s.connect(reverb); return s; },
+  nylon:     (reverb) => { const s = makeNylon(-8);      s.connect(reverb); return s; },
+  violin:    (reverb) => { const s = makeViolin(-10);    s.connect(reverb); return s; },
+  viola:     (reverb) => { const s = makeViola(-9);      s.connect(reverb); return s; },
+  cello:     (reverb) => { const s = makeCello(-8);      s.connect(reverb); return s; },
+  strings:   (reverb) => { const s = makeStrings(-10);   s.connect(reverb); return s; },
+  music_box: (reverb) => { const s = makeMusicBox(-4);   s.connect(reverb); return s; },
+  horn:      (reverb) => { const s = makeHorn(-10);      s.connect(reverb); return s; },
 };
 
 function makeUprightBass(volume) {
@@ -966,43 +1021,21 @@ export class DetailPanel {
       const filename = buildDownloadName(this.song, suffix);
       const li = document.createElement("li");
       const a = document.createElement("a");
-      // The href + download attr fallback works for same-origin only;
-      // Supabase Storage is a different origin so the browser would
-      // ignore `download` and use the URL filename ("audio_long.mid").
-      // Intercept with fetch+blob → same-origin object URL → browsers
-      // honor the chosen filename.
+      // Native click — browser decides "open in tab" (svg/json) vs
+      // "download" (mid/musicxml) per file type. Cross-origin means
+      // the `download` attribute name is ignored for the actual saved
+      // filename; we still set it as a hint and surface the intended
+      // name in the title tooltip.
       a.href = url;
       a.download = filename;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.title = filename;
       a.textContent = label;
-      a.addEventListener("click", (e) => {
-        e.preventDefault();
-        downloadAsBlob(url, filename).catch((err) => {
-          console.warn("[download] blob fallback failed:", err);
-          // Last resort: open original (browser will rename, but file
-          // is at least retrievable).
-          window.open(url, "_blank");
-        });
-      });
       li.appendChild(a);
       this.downloadsEl.appendChild(li);
     }
   }
-}
-
-async function downloadAsBlob(url, filename) {
-  const r = await fetch(url, { mode: "cors", credentials: "omit" });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const blob = await r.blob();
-  const objUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = objUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(objUrl);
-    a.remove();
-  }, 1000);
 }
 
 function formatDate(iso) {

@@ -61,8 +61,14 @@ def pick_genre(
     f: Features,
     avoid: list[str] | None = None,
     preferred: str | None = None,
+    force: str | None = None,
 ) -> str:
-    # default weights then weather lift
+    """Pick a genre. `force` short-circuits everything (manual override
+    from the user); `preferred` is a soft +bias; `avoid` is a soft
+    suppression."""
+    if force and force in GENRES:
+        return force
+
     w = {g: 1.0 for g in GENRES}
     w["ambient"] += 0.5 * f.calmness
     w["bossa_nova"] += 0.6 * f.brightness * f.warmth

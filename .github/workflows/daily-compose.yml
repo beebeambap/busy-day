@@ -23,7 +23,11 @@ on:
         type: string
         default: ""
       instrument:
-        description: "melody instrument (piano/rhodes/nylon/strings/music_box/horn)"
+        description: "melody instrument (piano/rhodes/nylon/violin/viola/cello/strings/music_box/horn)"
+        type: string
+        default: ""
+      force_genre:
+        description: "hard-pin genre (ambient/bossa_nova/jazz_ballad/lo_fi/neo_classical/folk)"
         type: string
         default: ""
 
@@ -54,12 +58,14 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_STORAGE_BUCKET:   busy-day-archive
         run: |
-          DATE="${{ github.event.inputs.date    || 'today'  }}"
-          CITY="${{ github.event.inputs.city    || 'seoul'  }}"
-          VARIANT="${{ github.event.inputs.variant    || 'auto' }}"
-          INTENT="${{ github.event.inputs.intent     || '' }}"
+          DATE="${{ github.event.inputs.date        || 'today'  }}"
+          CITY="${{ github.event.inputs.city        || 'seoul'  }}"
+          VARIANT="${{ github.event.inputs.variant      || 'auto' }}"
+          INTENT="${{ github.event.inputs.intent        || '' }}"
           INSTRUMENT="${{ github.event.inputs.instrument || '' }}"
+          FORCE_GENRE="${{ github.event.inputs.force_genre || '' }}"
           ARGS="--date $DATE --city $CITY --variant $VARIANT"
-          if [ -n "$INTENT" ];     then ARGS="$ARGS --intent $INTENT";         fi
-          if [ -n "$INSTRUMENT" ]; then ARGS="$ARGS --instrument $INSTRUMENT"; fi
+          if [ -n "$INTENT" ];      then ARGS="$ARGS --intent $INTENT";         fi
+          if [ -n "$INSTRUMENT" ];  then ARGS="$ARGS --instrument $INSTRUMENT"; fi
+          if [ -n "$FORCE_GENRE" ]; then ARGS="$ARGS --force-genre $FORCE_GENRE"; fi
           python -m compose daily $ARGS

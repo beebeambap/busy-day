@@ -27,6 +27,7 @@ def _decide_spec(
     avoid_genres: list[str] | None,
     avoid_motifs: list[str] | None,
     preferred_genre: str | None,
+    force_genre: str | None = None,
     intent: Intent | None = None,
     seed_salt: str = "",
 ) -> dict:
@@ -46,7 +47,8 @@ def _decide_spec(
     if intent and intent.avoid_genres:
         eff_avoid.extend(intent.avoid_genres)
     pref = preferred_genre or (intent.preferred_genre if intent else None)
-    genre = pick_genre(s("genre"), features, avoid=eff_avoid, preferred=pref)
+    genre = pick_genre(s("genre"), features,
+                      avoid=eff_avoid, preferred=pref, force=force_genre)
 
     bpm = pick_bpm(s("bpm"), features, genre)
     if intent and intent.bpm_clamp:
@@ -74,6 +76,7 @@ def generate_pair(
     avoid_genres: list[str] | None = None,
     avoid_motifs: list[str] | None = None,
     preferred_genre: str | None = None,
+    force_genre: str | None = None,
     intent: Intent | None = None,
     seed_salt: str = "",
     generator_ver: str = GENERATOR_VER,
@@ -93,6 +96,7 @@ def generate_pair(
         avoid_genres=avoid_genres,
         avoid_motifs=avoid_motifs,
         preferred_genre=preferred_genre,
+        force_genre=force_genre,
         intent=intent,
         seed_salt=seed_salt,
     )

@@ -1,20 +1,8 @@
 // busy-day /trigger
 //
-// POST { date, city?, intent_id, instrument_id? }
+// POST { date, city?, intent_id, instrument_id?, genre_id? }
 // -> dispatches the daily-compose GitHub Actions workflow with a
 //    user-scoped variant_id, returns { variant_id, eta_sec }.
-//
-// Auth: this function intentionally has verify_jwt=false because the
-// page is gated by a client-side password (single-user app). Anonymous
-// abuse would only burn the PAT's workflow_dispatch quota; rotate the
-// PAT if that ever happens.
-//
-// Required secret on the Supabase project:
-//   GITHUB_PAT       (fine-grained PAT, Actions: Read and write)
-// Optional overrides:
-//   GITHUB_OWNER     default beebeambap
-//   GITHUB_REPO      default busy-day
-//   GITHUB_WORKFLOW  default daily-compose.yml
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
@@ -32,7 +20,12 @@ const INTENT_IDS = new Set([
   "dawn", "commute", "nap", "focus", "walk",
 ]);
 const INSTRUMENT_IDS = new Set([
-  "piano", "rhodes", "nylon", "strings", "music_box", "horn",
+  "piano", "rhodes", "nylon", "violin", "viola", "cello",
+  "strings", "music_box", "horn",
+]);
+const GENRE_IDS = new Set([
+  "ambient", "bossa_nova", "jazz_ballad", "lo_fi",
+  "neo_classical", "folk",
 ]);
 
 function j(body: unknown, status = 200): Response {
@@ -43,19 +36,15 @@ function j(body: unknown, status = 200): Response {
 }
 
 function kstHHMM(): string {
-  const now = new Date(Date.now() + 9 * 3600 * 1000); // UTC -> KST
+  const now = new Date(Date.now() + 9 * 3600 * 1000);
   const hh = String(now.getUTCHours()).padStart(2, "0");
   const mm = String(now.getUTCMinutes()).padStart(2, "0");
   return `${hh}${mm}`;
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS_HEADERS });
-  }
-  if (req.method !== "POST") {
-    return j({ error: "method not allowed" }, 405);
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== "POST")    return j({ error: "method not allowed" }, 405);
 
   let body: any = {};
   try { body = await req.json(); }
@@ -65,12 +54,14 @@ Deno.serve(async (req: Request) => {
   const city         = String(body.city          ?? "seoul").slice(0, 32);
   const intentId     = String(body.intent_id     ?? "").slice(0, 32);
   const instrumentId = String(body.instrument_id ?? "").slice(0, 32);
+  const genreId      = String(body.genre_id      ?? "").slice(0, 32);
 
-  if (!INTENT_IDS.has(intentId)) {
-    return j({ error: "invalid intent_id" }, 400);
-  }
+  if (!INTENT_IDS.has(intentId)) return j({ error: "invalid intent_id" }, 400);
   if (instrumentId && !INSTRUMENT_IDS.has(instrumentId)) {
     return j({ error: "invalid instrument_id" }, 400);
+  }
+  if (genreId && !GENRE_IDS.has(genreId)) {
+    return j({ error: "invalid genre_id" }, 400);
   }
 
   const pat   = Deno.env.get("GITHUB_PAT");
@@ -79,10 +70,10 @@ Deno.serve(async (req: Request) => {
   const wf    = Deno.env.get("GITHUB_WORKFLOW") ?? "daily-compose.yml";
   if (!pat) return j({ error: "server missing GITHUB_PAT" }, 500);
 
-  const tag = instrumentId
-    ? `${intentId}-${instrumentId}`
-    : intentId;
-  const variantId = `user-${kstHHMM()}-${tag}`;
+  const tagBits = [intentId];
+  if (genreId)      tagBits.push(genreId);
+  if (instrumentId) tagBits.push(instrumentId);
+  const variantId = `user-${kstHHMM()}-${tagBits.join("-")}`;
 
   const ghResp = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf}/dispatches`,
@@ -97,11 +88,11 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         ref: "main",
         inputs: {
-          date,
-          city,
+          date, city,
           variant: variantId,
           intent: intentId,
           instrument: instrumentId,
+          force_genre: genreId,
         },
       }),
     },
@@ -109,15 +100,14 @@ Deno.serve(async (req: Request) => {
 
   if (!ghResp.ok) {
     const text = await ghResp.text();
-    return j({
-      error: "dispatch failed", status: ghResp.status, detail: text,
-    }, 502);
+    return j({ error: "dispatch failed", status: ghResp.status, detail: text }, 502);
   }
 
   return j({
     variant_id:    variantId,
     intent_id:     intentId,
     instrument_id: instrumentId || null,
+    genre_id:      genreId || null,
     date, city,
     eta_sec: 90,
   });

@@ -1,6 +1,32 @@
 import { fetchMonth } from "./api.js";
 import { DEFAULT_CITY } from "./config.js";
 
+// Pure function of song.weather. Returns a Set of category tags.
+// Mirrors main.js.categorizeWeather but lives here to avoid a circular
+// import (main.js imports CalendarView from this file).
+function categorizeWeather(w) {
+  if (!w) return new Set();
+  const tags = new Set();
+  const pcp   = Number(w.precip_mm  ?? 0);
+  const wind  = Number(w.wind_mps   ?? 0);
+  const cloud = Number(w.cloud_pct  ?? 50);
+  const tempC = Number(w.temp_c     ?? 15);
+  const humid = Number(w.humidity   ?? 60);
+  const ptype = String(w.precip_type ?? "none");
+
+  if (ptype === "snow" || ptype === "rain_snow") tags.add("snow");
+  else if (pcp > 0.1 || ptype === "rain" || ptype === "shower") tags.add("rain");
+  else if (cloud >= 70) tags.add("cloudy");
+  else if (cloud < 30) tags.add("clear");
+  else tags.add("cloudy");
+
+  if (wind >= 5)        tags.add("windy");
+  if (tempC <= 0)       tags.add("cold");
+  if (tempC >= 26)      tags.add("hot");
+  if (humid >= 80 && pcp < 0.5) tags.add("humid");
+  return tags;
+}
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -30,12 +56,18 @@ export class CalendarView {
     this.gridEl = gridEl;
     this.labelEl = labelEl;
     this.onDayClick = onDayClick;
+    this.filter = null;        // null = no filter; else weather category tag
     const today = new Date();
     this.year = today.getFullYear();
     this.month = today.getMonth() + 1;
 
     prevBtn.addEventListener("click", () => this.shift(-1));
     nextBtn.addEventListener("click", () => this.shift(+1));
+  }
+
+  setFilter(tag) {
+    this.filter = tag || null;
+    this.render();
   }
 
   async shift(delta) {
@@ -81,9 +113,14 @@ export class CalendarView {
       num.textContent = d.getDate();
       cell.appendChild(num);
 
-      const variants = songs.get(dStr);
+      let variants = songs.get(dStr);
+      if (this.filter && variants) {
+        variants = variants.filter((v) =>
+          categorizeWeather(v.weather).has(this.filter),
+        );
+      }
       if (variants && variants.length && inMonth) {
-        const primary = variants[0];   // auto first if present, else newest
+        const primary = variants[0];
         cell.classList.add("has-song");
         const tag = document.createElement("span");
         tag.className = "genre";
@@ -98,6 +135,9 @@ export class CalendarView {
         cell.addEventListener("click", () =>
           this.onDayClick(primary, variants),
         );
+      } else if (this.filter && songs.get(dStr) && inMonth) {
+        // had songs but filter excluded them all — show as faded
+        cell.classList.add("filtered-out");
       }
 
       this.gridEl.appendChild(cell);
