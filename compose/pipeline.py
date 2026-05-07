@@ -60,6 +60,7 @@ def _decide_spec(
     return {
         "key_root": key, "mode": mode, "genre": genre,
         "bpm": bpm, "meter": meter, "motif": motif,
+        "intent_id": intent.id if intent else None,
     }
 
 

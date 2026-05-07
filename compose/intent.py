@@ -61,6 +61,9 @@ INTENTS: dict[str, Intent] = {
         id="after_rain",
         label_ko="비 온 뒤처럼",
         deltas={"wetness": +0.30, "brightness": -0.10, "calmness": +0.20},
+        # bVII-IV-I needs mixolydian to actually sound like the ♭VII;
+        # in ionian the same degree sequence reads as vii°-IV-I.
+        mode_bias="mixolydian",
         bpm_clamp=(72, 90),
     ),
     "sleep": Intent(

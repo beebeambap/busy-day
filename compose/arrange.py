@@ -30,6 +30,7 @@ from .comping import (
 )
 from .features import Features
 from .harmony import progression, voicing_for_genre
+from .progressions import progression_for_intent
 from .humanize import (
     apply_micro_timing,
     apply_outro_decay,
@@ -78,6 +79,58 @@ def _pitch_class_name(midi: int) -> str:
     return f"{names[midi % 12]}{octave}"
 
 
+def _apply_wind_density(bars, wind_factor, rng):
+    """Modulate melody note density by wind.
+
+    bars     : list of bars; each bar is a list of (degree, oct, dur).
+    wind_factor : 0..1 (wind_mps/8 clipped).
+      < 0.30  → thin: drop short interior notes, merging duration left
+      > 0.60  → dense: split longer notes with a stepwise passing tone
+
+    Mid-range (0.30..0.60) leaves the bar untouched. We deliberately
+    keep the modification gentle so the Muji ceiling on density holds.
+    """
+    if 0.30 <= wind_factor <= 0.60:
+        return bars
+
+    out_bars = []
+    if wind_factor < 0.30:
+        thin_p = (0.30 - wind_factor) * 1.5  # max 0.45 at wind=0
+        for bar in bars:
+            new_bar = []
+            for i, note in enumerate(bar):
+                deg, oct_shift, dur = note
+                interior = 0 < i < len(bar) - 1
+                if interior and dur < 0.6 and rng.random() < thin_p and new_bar:
+                    pdeg, poct, pdur = new_bar[-1]
+                    new_bar[-1] = (pdeg, poct, pdur + dur)
+                    continue
+                new_bar.append(note)
+            out_bars.append(new_bar)
+        return out_bars
+
+    # dense
+    dense_p = min(1.0, (wind_factor - 0.60) * 2.0)
+    for bar in bars:
+        new_bar = []
+        for i, note in enumerate(bar):
+            deg, oct_shift, dur = note
+            if dur >= 0.5 and rng.random() < dense_p:
+                next_deg = bar[i + 1][0] if i + 1 < len(bar) else deg
+                if next_deg == deg:
+                    passing = deg + 1
+                elif next_deg > deg:
+                    passing = deg + 1
+                else:
+                    passing = deg - 1
+                new_bar.append((deg, oct_shift, dur * 0.6))
+                new_bar.append((passing, oct_shift, dur * 0.4))
+            else:
+                new_bar.append(note)
+        out_bars.append(new_bar)
+    return out_bars
+
+
 def _spread_for(warmth: float) -> str:
     """Voicing spread from normalized warmth (0..1)."""
     if warmth < 0.30:
@@ -119,6 +172,8 @@ def compose_ir(
     chord_seq: list[int] = []
     bars_meta: list[dict] = []
 
+    intent_id = spec.get("intent_id")
+
     for section in form:
         n = sec_len[section]
         if section in ("INTRO", "OUTRO"):
@@ -127,13 +182,27 @@ def compose_ir(
                 seq[-2] = 4 if mode != "mixolydian" else 7
         else:
             cad = "tonic" if section == "A_PRIME" else "open"
-            seq = progression(rng, mode, n, cadence=cad)
+            # Curated intent progressions take priority over the Markov
+            # generator. Cron's auto song (intent_id is None) keeps the
+            # Markov path so its sound stays familiar.
+            seq = progression_for_intent(intent_id, rng, n,
+                                         cadence=cad, mode=mode)
+            if seq is None:
+                seq = progression(rng, mode, n, cadence=cad)
         chord_seq.extend(seq)
         for d in seq:
             bars_meta.append({"section": section, "chord_degree": d, "beats": bpb})
 
     # melody over the whole sequence (intro/outro included; intro often sparse)
     melody_bars = melody_over_progression(rng, motif, chord_seq, bpb)
+
+    # Wind shapes note density: still day -> thin out short notes,
+    # windy day -> insert stepwise passing tones. Stays inside the
+    # Muji-leaning ceiling because the rule only fires at the
+    # extremes (< 0.30 or > 0.60 of the wind factor).
+    wind_factor = max(0.0, min(1.0,
+                               float((weather or {}).get("wind_mps", 2)) / 8.0))
+    melody_bars = _apply_wind_density(melody_bars, wind_factor, rng)
 
     voicing = voicing_for_genre(genre)
     melody_events = []
