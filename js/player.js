@@ -261,7 +261,221 @@ function makePercussion() {
   };
 }
 
-const _instruments = new Map(); // cache key -> { melody, harmony, bass, percussion, ready }
+const _instruments = new Map(); // cache key -> { melody, harmony, bass, percussion, reverb, ready }
+
+// ── ambience layer (synthesized weather sounds) ──────────────────
+//
+// Pure function of weather + features. No external samples; everything
+// is built from Tone.js primitives so the layer ships with the page.
+// Voices are routed dry (no reverb) because rain/wind on top of the
+// already-reverbed instruments would mush.
+
+function _clip01(x) { return Math.max(0, Math.min(1, x)); }
+
+export function decideAmbience(weather, features) {
+  const w        = weather  || {};
+  const f        = features || {};
+  const pcp      = Number(w.precip_mm ?? 0);
+  const wind     = Number(w.wind_mps  ?? 0);
+  const tempC    = Number(w.temp_c    ?? 15);
+  const humidity = Number(w.humidity  ?? 60);
+  const bright   = Number(f.brightness ?? 0.5);
+  const warm     = Number(f.warmth     ?? 0.5);
+
+  const layers = [];
+
+  if (pcp > 0.1) {
+    const intensity = _clip01(pcp / 10.0);
+    layers.push({
+      type: "rain",
+      volume_db: round1(-34 + _clip01(pcp / 20) * 20),
+      intensity,
+    });
+  }
+
+  if (wind > 4.0) {
+    layers.push({
+      type: "wind",
+      volume_db: round1(-36 + _clip01((wind - 4) / 8) * 20),
+      intensity: _clip01(wind / 12),
+    });
+  }
+
+  if (bright > 0.7 && warm > 0.5 && pcp < 0.5) {
+    layers.push({
+      type: "birds",
+      volume_db: -28,
+      density: _clip01(bright),
+    });
+  }
+
+  if (tempC < 3.0) {
+    layers.push({ type: "indoor", volume_db: -30 });
+  }
+
+  if (humidity > 80 && wind < 3.0) {
+    layers.push({
+      type: "hum",
+      volume_db: -34,
+      intensity: _clip01((humidity - 80) / 20),
+    });
+  }
+
+  return layers;
+}
+
+export function reverbWetFromHumidity(humidity) {
+  const h = Number(humidity ?? 60);
+  return round2(0.20 + _clip01((h - 30) / 60) * 0.40);
+}
+
+function round1(x) { return Math.round(x * 10) / 10; }
+function round2(x) { return Math.round(x * 100) / 100; }
+
+function _makeRain(volumeDb, intensity = 0.5) {
+  const noise = new Tone.Noise("pink");
+  const filt = new Tone.Filter({
+    frequency: 1200 + intensity * 2200,
+    type: "lowpass",
+    rolloff: -24,
+    Q: 0.5,
+  });
+  const gain = new Tone.Gain(0).toDestination();
+  noise.chain(filt, gain);
+  noise.start();
+  gain.gain.rampTo(Tone.dbToGain(volumeDb), 1.5);
+  return {
+    dispose() {
+      gain.gain.rampTo(0, 0.6);
+      setTimeout(() => {
+        try { noise.stop(); } catch {}
+        noise.dispose(); filt.dispose(); gain.dispose();
+      }, 700);
+    },
+  };
+}
+
+function _makeWind(volumeDb, intensity = 0.5) {
+  const noise = new Tone.Noise("brown");
+  const filt = new Tone.Filter({
+    frequency: 600, type: "bandpass", Q: 0.4,
+  });
+  const lfo = new Tone.LFO({
+    frequency: 0.15 + intensity * 0.2, min: 200, max: 1500, type: "sine",
+  });
+  lfo.connect(filt.frequency);
+  const gain = new Tone.Gain(0).toDestination();
+  noise.chain(filt, gain);
+  noise.start();
+  lfo.start();
+  gain.gain.rampTo(Tone.dbToGain(volumeDb), 2);
+  return {
+    dispose() {
+      gain.gain.rampTo(0, 0.8);
+      setTimeout(() => {
+        try { noise.stop(); lfo.stop(); } catch {}
+        noise.dispose(); filt.dispose(); lfo.dispose(); gain.dispose();
+      }, 900);
+    },
+  };
+}
+
+function _makeBirds(volumeDb, density = 0.35) {
+  const synth = new Tone.FMSynth({
+    harmonicity: 12,
+    modulationIndex: 5,
+    envelope:   { attack: 0.001, decay: 0.07, sustain: 0, release: 0.06 },
+    modulation: { type: "sine" },
+    modulationEnvelope: {
+      attack: 0.001, decay: 0.06, sustain: 0, release: 0.05,
+    },
+    volume: volumeDb,
+  }).toDestination();
+
+  const NOTES = ["A6", "B6", "C7", "D7", "E7", "G7"];
+  const loop = new Tone.Loop((time) => {
+    if (Math.random() < density * 0.35) {
+      const note = NOTES[Math.floor(Math.random() * NOTES.length)];
+      synth.triggerAttackRelease(note, "32n", time, 0.6 + Math.random() * 0.3);
+      if (Math.random() < 0.4) {
+        synth.triggerAttackRelease(note, "32n", time + 0.08, 0.5);
+      }
+    }
+  }, "8n");
+  loop.start(0);
+
+  return {
+    dispose() {
+      try { loop.stop(); } catch {}
+      loop.dispose(); synth.dispose();
+    },
+  };
+}
+
+function _makeIndoor(volumeDb) {
+  const drone = new Tone.Oscillator(46, "sine"); // ~A#1
+  const noise = new Tone.Noise("brown");
+  const filt  = new Tone.Filter({ frequency: 350, type: "lowpass" });
+  const gain  = new Tone.Gain(0).toDestination();
+  drone.connect(gain);
+  noise.connect(filt); filt.connect(gain);
+  drone.start(); noise.start();
+  gain.gain.rampTo(Tone.dbToGain(volumeDb), 2);
+  return {
+    dispose() {
+      gain.gain.rampTo(0, 0.8);
+      setTimeout(() => {
+        try { drone.stop(); noise.stop(); } catch {}
+        drone.dispose(); noise.dispose(); filt.dispose(); gain.dispose();
+      }, 900);
+    },
+  };
+}
+
+function _makeHum(volumeDb) {
+  const a = new Tone.Oscillator(41, "sine"); // E1
+  const b = new Tone.Oscillator(48, "sine"); // C2
+  const gain = new Tone.Gain(0).toDestination();
+  a.connect(gain); b.connect(gain);
+  a.start(); b.start();
+  gain.gain.rampTo(Tone.dbToGain(volumeDb), 2.5);
+  return {
+    dispose() {
+      gain.gain.rampTo(0, 1.0);
+      setTimeout(() => {
+        try { a.stop(); b.stop(); } catch {}
+        a.dispose(); b.dispose(); gain.dispose();
+      }, 1100);
+    },
+  };
+}
+
+const AMB_FACTORIES = {
+  rain:   (l) => _makeRain  (l.volume_db, l.intensity),
+  wind:   (l) => _makeWind  (l.volume_db, l.intensity),
+  birds:  (l) => _makeBirds (l.volume_db, l.density),
+  indoor: (l) => _makeIndoor(l.volume_db),
+  hum:    (l) => _makeHum   (l.volume_db),
+};
+
+let _ambVoices = [];
+
+function startAmbience(layers) {
+  stopAmbience();
+  for (const l of layers) {
+    const f = AMB_FACTORIES[l.type];
+    if (!f) continue;
+    try { _ambVoices.push(f(l)); }
+    catch (err) { console.warn("[ambience] failed:", l.type, err); }
+  }
+}
+
+function stopAmbience() {
+  for (const v of _ambVoices) {
+    try { v.dispose(); } catch {}
+  }
+  _ambVoices = [];
+}
 
 function buildInstruments(genre, instrumentId) {
   const reverb = new Tone.Reverb({ decay: 3.6, wet: 0.34 }).toDestination();
@@ -312,11 +526,14 @@ function buildInstruments(genre, instrumentId) {
 
   const percussion = makePercussion();
 
-  const entry = { melody, harmony, bass, percussion, ready: Promise.all(ready) };
+  const entry = {
+    melody, harmony, bass, percussion, reverb,
+    ready: Promise.all(ready),
+  };
   return entry;
 }
 
-async function getInstruments(genre, instrumentId) {
+async function getInstruments(genre, instrumentId, reverbWet = null) {
   const key = `${genre}::${instrumentId || ""}`;
   let cached = _instruments.get(key);
   if (!cached) {
@@ -324,6 +541,11 @@ async function getInstruments(genre, instrumentId) {
     _instruments.set(key, cached);
   }
   await cached.ready;
+  // Per-song reverb adjustment (humidity-driven). Smooth ramp so it
+  // doesn't click when swapping variants.
+  if (cached.reverb && reverbWet != null) {
+    cached.reverb.wet.rampTo(reverbWet, 0.5);
+  }
   return cached;
 }
 
@@ -540,8 +762,15 @@ export class DetailPanel {
 
     const genre = this.song?.genre || "ambient";
     const instrumentId = this.song?.instrument_id || null;
+    const reverbWet = reverbWetFromHumidity(this.song?.weather?.humidity);
     const { melody, harmony, bass, percussion } =
-      await getInstruments(genre, instrumentId);
+      await getInstruments(genre, instrumentId, reverbWet);
+
+    // Ambience layers — derived purely from weather + features so they
+    // stay reproducible. Started here so they begin on the same gesture
+    // that started Tone.Transport (browsers require this).
+    const ambLayers = decideAmbience(this.song?.weather, this.song?.features);
+    startAmbience(ambLayers);
 
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
@@ -595,6 +824,7 @@ export class DetailPanel {
   stop() {
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
+    stopAmbience();
     if (this.tickHandle) {
       cancelAnimationFrame(this.tickHandle);
       this.tickHandle = null;
