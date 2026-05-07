@@ -26,7 +26,10 @@ const CORS_HEADERS = {
 };
 
 const INTENT_IDS = new Set([
+  // emotional moods
   "calm", "warm", "wistful", "lively", "after_rain", "sleep",
+  // situational moods (manual-only flow)
+  "dawn", "commute", "nap", "focus", "walk",
 ]);
 const INSTRUMENT_IDS = new Set([
   "piano", "rhodes", "nylon", "strings", "music_box", "horn",

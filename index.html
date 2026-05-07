@@ -59,13 +59,21 @@
       <p class="section-label">무드</p>
       <div class="intents" id="intent-grid"></div>
 
+      <p class="section-label">시간 · 상황</p>
+      <div class="intents" id="situation-grid"></div>
+
       <p class="section-label">사운드</p>
       <div class="intents instruments" id="instrument-grid"></div>
 
       <div class="modal-actions">
         <button id="intent-submit" type="button" class="primary" disabled>곡 만들기</button>
       </div>
-      <p id="intent-status" class="muted small" hidden></p>
+
+      <div id="intent-progress" class="intent-progress" hidden>
+        <p id="intent-status" class="muted small">곡을 빚는 중…</p>
+        <progress id="intent-bar" max="100" value="0"></progress>
+        <p id="intent-eta" class="muted small">—</p>
+      </div>
     </div>
   </aside>
 

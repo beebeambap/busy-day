@@ -73,6 +73,46 @@ INTENTS: dict[str, Intent] = {
         preferred_genre="ambient",
         bpm_clamp=(60, 70),
     ),
+
+    # ── 시간/상황 무드 (manual trigger only) ─────────────────────────
+    # The auto cron always fires at 06:00 KST, so situational presets
+    # only really make sense when the user is composing on demand.
+    # These act like the emotional intents above (deltas + biases) but
+    # carry a different label set so the UI can group them.
+    "dawn": Intent(
+        id="dawn",
+        label_ko="새벽",
+        deltas={"brightness": -0.30, "calmness": +0.45, "warmth": -0.10},
+        preferred_genre="ambient",
+        bpm_clamp=(50, 65),
+    ),
+    "commute": Intent(
+        id="commute",
+        label_ko="출근길",
+        deltas={"brightness": +0.10, "calmness": -0.10},
+        bpm_clamp=(75, 88),
+    ),
+    "nap": Intent(
+        id="nap",
+        label_ko="낮잠",
+        deltas={"brightness": -0.10, "calmness": +0.30, "warmth": +0.10},
+        preferred_genre="ambient",
+        bpm_clamp=(58, 72),
+    ),
+    "focus": Intent(
+        id="focus",
+        label_ko="작업 중",
+        deltas={"brightness": +0.05, "calmness": +0.10},
+        avoid_genres=("bossa_nova",),    # too "songy" for background work
+        bpm_clamp=(70, 84),
+    ),
+    "walk": Intent(
+        id="walk",
+        label_ko="산책",
+        deltas={"brightness": +0.15, "warmth": +0.10, "calmness": -0.05},
+        preferred_genre="folk",
+        bpm_clamp=(78, 94),
+    ),
 }
 
 

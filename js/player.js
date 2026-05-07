@@ -84,19 +84,20 @@ function makeStrings(volume) {
 
 function makeMusicBox(volume) {
   // Bell-like FM with inharmonic ratio (3.01) so it rings rather than
-  // hums. Long decay = the actual ring; release covers tails when the
-  // player asks for sustained notes.
-  return new Tone.PolySynth(Tone.FMSynth, {
+  // hums. Construction kept minimal because Tone.PolySynth in v14 has
+  // known quirks propagating nested oscillator/modulation options into
+  // each voice. We pass only flat options + envelopes and set the
+  // master volume on the synth's own .volume.value.
+  const synth = new Tone.PolySynth(Tone.FMSynth, {
     harmonicity: 3.01,
     modulationIndex: 14,
-    oscillator: { type: "sine" },
-    envelope:   { attack: 0.002, decay: 1.8, sustain: 0.05, release: 1.8 },
-    modulation: { type: "sine" },
+    envelope: { attack: 0.002, decay: 1.8, sustain: 0.05, release: 1.8 },
     modulationEnvelope: {
-      attack: 0.005, decay: 0.4, sustain: 0.0, release: 0.4,
+      attack: 0.005, decay: 0.6, sustain: 0.0, release: 0.4,
     },
-    volume,
   });
+  synth.volume.value = volume;
+  return synth;
 }
 
 function makeHorn(volume) {
@@ -116,21 +117,16 @@ function makeHorn(volume) {
 // instrument_id (user override) -> factory(reverbBus) returning the
 // melody synth already routed to the bus. Returning null = no override,
 // fall back to the genre-derived melody.
+// Each factory MUST return the synth itself (never a downstream node)
+// because Tone's `connect` returns the source in v14 but tooling
+// changes have bitten us before. Be explicit.
 const INSTRUMENT_FACTORIES = {
-  piano: (reverb) => makePiano(2.4, -4).connect(reverb),
-  rhodes: (reverb) => {
-    const r = makeRhodes(-10);
-    r.connect(reverb);
-    return r;
-  },
-  nylon: (reverb) => {
-    const n = makeNylon(-8);
-    n.connect(reverb);
-    return n;
-  },
-  strings:   (reverb) => makeStrings(-12).connect(reverb),
-  music_box: (reverb) => makeMusicBox(-10).connect(reverb),
-  horn:      (reverb) => makeHorn(-12).connect(reverb),
+  piano:     (reverb) => { const s = makePiano(2.4, -4); s.connect(reverb); return s; },
+  rhodes:    (reverb) => { const s = makeRhodes(-10);     s.connect(reverb); return s; },
+  nylon:     (reverb) => { const s = makeNylon(-8);       s.connect(reverb); return s; },
+  strings:   (reverb) => { const s = makeStrings(-10);    s.connect(reverb); return s; },
+  music_box: (reverb) => { const s = makeMusicBox(-4);    s.connect(reverb); return s; },
+  horn:      (reverb) => { const s = makeHorn(-10);       s.connect(reverb); return s; },
 };
 
 function makeUprightBass(volume) {
@@ -672,6 +668,12 @@ const INTENT_LABELS = {
   lively:     "활기",
   after_rain: "비 온 뒤",
   sleep:      "잠들기 전",
+  // situational
+  dawn:       "새벽",
+  commute:    "출근길",
+  nap:        "낮잠",
+  focus:      "작업 중",
+  walk:       "산책",
 };
 
 const INSTRUMENT_LABELS = {
@@ -961,15 +963,46 @@ export class DetailPanel {
     for (const [key, label, suffix] of DOWNLOAD_KEYS) {
       const url = publicUrl(paths[key]);
       if (!url) continue;
+      const filename = buildDownloadName(this.song, suffix);
       const li = document.createElement("li");
       const a = document.createElement("a");
+      // The href + download attr fallback works for same-origin only;
+      // Supabase Storage is a different origin so the browser would
+      // ignore `download` and use the URL filename ("audio_long.mid").
+      // Intercept with fetch+blob → same-origin object URL → browsers
+      // honor the chosen filename.
       a.href = url;
-      a.download = buildDownloadName(this.song, suffix);
+      a.download = filename;
       a.textContent = label;
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        downloadAsBlob(url, filename).catch((err) => {
+          console.warn("[download] blob fallback failed:", err);
+          // Last resort: open original (browser will rename, but file
+          // is at least retrievable).
+          window.open(url, "_blank");
+        });
+      });
       li.appendChild(a);
       this.downloadsEl.appendChild(li);
     }
   }
+}
+
+async function downloadAsBlob(url, filename) {
+  const r = await fetch(url, { mode: "cors", credentials: "omit" });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const blob = await r.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(objUrl);
+    a.remove();
+  }, 1000);
 }
 
 function formatDate(iso) {
