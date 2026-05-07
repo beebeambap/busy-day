@@ -153,4 +153,15 @@ def render_midi(ir: dict, path: str) -> None:
         _flush_track(perc, msgs)
         mid.tracks.append(perc)
 
+    # drone (cloudy-day fog layer). One sustained low pitch per section
+    # on its own channel + program (GM 88 = New Age Pad).
+    drone_events = ir.get("tracks", {}).get("drone", [])
+    if drone_events:
+        dr = _track_with_program("drone", program=88, channel=3)
+        _flush_track(
+            dr,
+            _events_to_messages(drone_events, channel=3, bpb=bpb),
+        )
+        mid.tracks.append(dr)
+
     mid.save(path)

@@ -100,11 +100,13 @@ def generate_pair(
         date_iso=date_iso, city_id=city_id, seed=seed,
         rng=rng(seed, f"{seed_salt}compose:short"),
         features=features, spec=spec, target_sec=short_sec,
+        weather=weather,
     )
     ir_long = compose_ir(
         date_iso=date_iso, city_id=city_id, seed=seed,
         rng=rng(seed, f"{seed_salt}compose:long"),
         features=features, spec=spec, target_sec=long_sec,
+        weather=weather,
     )
     ir_short["weather"] = weather
     ir_long["weather"]  = weather

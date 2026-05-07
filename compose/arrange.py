@@ -78,6 +78,15 @@ def _pitch_class_name(midi: int) -> str:
     return f"{names[midi % 12]}{octave}"
 
 
+def _spread_for(warmth: float) -> str:
+    """Voicing spread from normalized warmth (0..1)."""
+    if warmth < 0.30:
+        return "tight"
+    if warmth > 0.70:
+        return "wide"
+    return "default"
+
+
 def compose_ir(
     *,
     date_iso: str,
@@ -87,12 +96,17 @@ def compose_ir(
     features: Features,
     spec: dict,
     target_sec: float = 60.0,
+    weather: dict | None = None,
 ) -> dict:
     bpm = spec["bpm"]
     mode = spec["mode"]
     key = spec["key_root"]
     genre = spec["genre"]
     meter = spec["meter"]
+    voicing_spread = _spread_for(features.warmth)
+    cloud_pct = float((weather or {}).get("cloud_pct", 50.0))
+    drone_on = cloud_pct >= 70.0  # cloudy day → fog-drone
+    drone_events: list[dict] = []
     motif = spec["motif"]
     bpb = _beats_per_bar(meter)
 
@@ -166,7 +180,8 @@ def compose_ir(
         #    to tonic + sustained ring-out so the piece breathes shut.
         chord_for_harmony = 1 if is_final else chord_root
         full_chord = chord_pitches(key, mode, chord_for_harmony,
-                                   voicing=voicing, base_octave=3)
+                                   voicing=voicing, base_octave=3,
+                                   spread=voicing_spread)
         if is_final:
             ring_out_beats = bpb * 1.0
             harmony_events.append({
@@ -246,6 +261,32 @@ def compose_ir(
 
         cur_bar += 1
 
+    # ── drone (cloudy days). One sustained tonic per section, very low,
+    #    very quiet. Acts like fog under the mix.
+    if drone_on:
+        drone_pitch = degree_to_midi(key, mode, 1, octave_shift=-2,
+                                     base_octave=2)
+        bar_cursor = 0
+        for s in form:
+            n = sec_len[s]
+            if n <= 0:
+                continue
+            vel_section = {
+                "INTRO":   24,
+                "A":       32,
+                "B":       30,
+                "A_PRIME": 32,
+                "OUTRO":   24,
+            }.get(s, 28)
+            drone_events.append({
+                "bar": bar_cursor,
+                "start_beat": 0.0,
+                "pitch": drone_pitch,
+                "dur_beats": n * bpb,
+                "vel": vel_section,
+            })
+            bar_cursor += n
+
     # ── humanization passes (deterministic via salted RNG) ──────────
     # Section breaks become phrase boundaries for the velocity arch.
     section_break_bars: list[int] = []
@@ -307,7 +348,9 @@ def compose_ir(
             "harmony":    harmony_events,
             "bass":       bass_events,
             "percussion": percussion_events,
+            "drone":      drone_events,
         },
+        "voicing_spread": voicing_spread,
         "pedals": pedals,
         "signature": signature,
         "start_pitch": _pitch_class_name(start_pitch_midi),

@@ -83,15 +83,17 @@ function makeStrings(volume) {
 }
 
 function makeMusicBox(volume) {
-  // FM bell — short attack, fast decay, bright partials
+  // Bell-like FM with inharmonic ratio (3.01) so it rings rather than
+  // hums. Long decay = the actual ring; release covers tails when the
+  // player asks for sustained notes.
   return new Tone.PolySynth(Tone.FMSynth, {
-    harmonicity: 6,
-    modulationIndex: 8,
+    harmonicity: 3.01,
+    modulationIndex: 14,
     oscillator: { type: "sine" },
-    envelope:   { attack: 0.005, decay: 0.45, sustain: 0.0, release: 1.6 },
+    envelope:   { attack: 0.002, decay: 1.8, sustain: 0.05, release: 1.8 },
     modulation: { type: "sine" },
     modulationEnvelope: {
-      attack: 0.005, decay: 0.55, sustain: 0.0, release: 0.6,
+      attack: 0.005, decay: 0.4, sustain: 0.0, release: 0.4,
     },
     volume,
   });
@@ -154,6 +156,42 @@ function makeAMPad(volume) {
     },
     volume,
   });
+}
+
+function makeDrone(volume) {
+  // Two detuned sines an octave apart — fog under the mix.
+  const out = new Tone.Gain(1);
+  const a = new Tone.Oscillator({ frequency: "C1", type: "sine" });
+  const b = new Tone.Oscillator({ frequency: "C2", type: "sine", detune: 4 });
+  const filt = new Tone.Filter({ frequency: 280, type: "lowpass", Q: 0.4 });
+  const gain = new Tone.Gain(Tone.dbToGain(volume)).connect(out);
+  a.connect(filt); b.connect(filt); filt.connect(gain);
+  // Polyphonic-ish facade: we expose triggerAttackRelease(note) and
+  // retune the oscillators on each call so the IR's drone events
+  // (one per section) actually retune the underlying drone.
+  return {
+    _a: a, _b: b, _gain: gain, _started: false,
+    output: out,
+    triggerAttackRelease(note, _dur, time, velocity = 0.7) {
+      const freq = Tone.Frequency(note).toFrequency();
+      a.frequency.setValueAtTime(freq, time);
+      b.frequency.setValueAtTime(freq * 2, time);
+      if (!this._started) {
+        a.start(time); b.start(time);
+        this._started = true;
+      }
+      // gentle level envelope synced to the section
+      gain.gain.cancelAndHoldAtTime(time);
+      gain.gain.setValueAtTime(gain.gain.value, time);
+      gain.gain.linearRampToValueAtTime(
+        Tone.dbToGain(volume) * velocity, time + 1.5,
+      );
+    },
+    dispose() {
+      try { a.stop(); b.stop(); } catch {}
+      a.dispose(); b.dispose(); filt.dispose(); gain.dispose(); out.dispose();
+    },
+  };
 }
 
 function makeStringPad(volume) {
@@ -480,23 +518,23 @@ function stopAmbience() {
 function buildInstruments(genre, instrumentId) {
   const reverb = new Tone.Reverb({ decay: 3.6, wet: 0.34 }).toDestination();
   const ready  = [reverb.generate()];
+  let needsSamples = false;       // becomes true if any voice uses Salamander
 
   let melody, harmony, bass;
 
-  if (genre === "jazz_ballad") {
-    melody  = makeRhodes(-10).connect(reverb);
-    harmony = makeRhodes(-18).connect(reverb);
-    bass    = makeUprightBass(-12).toDestination();
+  // ── melody. User override wins outright; otherwise genre-default.
+  if (instrumentId && INSTRUMENT_FACTORIES[instrumentId]) {
+    melody = INSTRUMENT_FACTORIES[instrumentId](reverb);
+    if (instrumentId === "piano") needsSamples = true;
+  } else if (genre === "jazz_ballad") {
+    melody = makeRhodes(-10).connect(reverb);
   } else if (genre === "bossa_nova") {
-    melody  = makeNylon(-8).connect(reverb);
-    harmony = makeNylon(-14).connect(reverb);
-    bass    = makeUprightBass(-10).toDestination();
+    melody = makeNylon(-8).connect(reverb);
   } else {
     // ambient / neo_classical / folk / lo_fi : piano-led
     const release = PIANO_RELEASE[genre] ?? 2.0;
-    const isLoFi = genre === "lo_fi";
+    const isLoFi  = genre === "lo_fi";
     melody = makePiano(release, isLoFi ? -8 : -4);
-
     if (isLoFi) {
       const lp = new Tone.Filter({
         frequency: 2400, type: "lowpass", rolloff: -12,
@@ -505,32 +543,44 @@ function buildInstruments(genre, instrumentId) {
     } else {
       melody.connect(reverb);
     }
+    needsSamples = true;
+  }
 
-    if (genre === "neo_classical") {
-      harmony = makeStringPad(-18).connect(reverb);
-    } else {
-      harmony = makeAMPad(-22).connect(reverb);
-    }
+  // ── harmony per genre.
+  if (genre === "jazz_ballad") {
+    harmony = makeRhodes(-18).connect(reverb);
+  } else if (genre === "bossa_nova") {
+    harmony = makeNylon(-14).connect(reverb);
+  } else if (genre === "neo_classical") {
+    harmony = makeStringPad(-18).connect(reverb);
+  } else {
+    harmony = makeAMPad(-22).connect(reverb);
+  }
 
+  // ── bass per genre.
+  if (genre === "jazz_ballad") {
+    bass = makeUprightBass(-12).toDestination();
+  } else if (genre === "bossa_nova") {
+    bass = makeUprightBass(-10).toDestination();
+  } else {
+    const release = PIANO_RELEASE[genre] ?? 2.0;
     bass = makePiano(release * 0.7, -10).toDestination();
-    ready.push(Tone.loaded());
+    needsSamples = true;
   }
 
-  // User instrument override applies to MELODY only — harmony/bass keep
-  // the genre's character so the result reads as "violin over a bossa".
-  if (instrumentId && INSTRUMENT_FACTORIES[instrumentId]) {
-    try { melody.disconnect(); } catch { /* not yet connected */ }
-    melody = INSTRUMENT_FACTORIES[instrumentId](reverb);
-    if (instrumentId === "piano") ready.push(Tone.loaded());
-  }
+  if (needsSamples) ready.push(Tone.loaded());
 
   const percussion = makePercussion();
+  // The drone is built lazily — only attached if the song's IR actually
+  // has drone events. Voice itself is always available so swapping
+  // between cloudy / clear songs without recreating the cache works.
+  const drone = makeDrone(-22);
+  drone.output.connect(reverb);
 
-  const entry = {
-    melody, harmony, bass, percussion, reverb,
+  return {
+    melody, harmony, bass, percussion, drone, reverb,
     ready: Promise.all(ready),
   };
-  return entry;
 }
 
 async function getInstruments(genre, instrumentId, reverbWet = null) {
@@ -763,7 +813,7 @@ export class DetailPanel {
     const genre = this.song?.genre || "ambient";
     const instrumentId = this.song?.instrument_id || null;
     const reverbWet = reverbWetFromHumidity(this.song?.weather?.humidity);
-    const { melody, harmony, bass, percussion } =
+    const { melody, harmony, bass, percussion, drone } =
       await getInstruments(genre, instrumentId, reverbWet);
 
     // Ambience layers — derived purely from weather + features so they
@@ -797,9 +847,10 @@ export class DetailPanel {
       }
 
       let inst;
-      if (name.includes("harmony"))   inst = harmony;
-      else if (name.includes("bass")) inst = bass;
-      else                            inst = melody;
+      if (name.includes("harmony"))    inst = harmony;
+      else if (name.includes("bass"))  inst = bass;
+      else if (name.includes("drone")) inst = drone;
+      else                             inst = melody;
 
       track.notes.forEach((note) => {
         Tone.Transport.schedule((time) => {
