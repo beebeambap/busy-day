@@ -13,7 +13,11 @@ import random
 def make_seed(date_iso: str, city_id: str, generator_ver: str) -> int:
     raw = f"{date_iso}|{city_id}|{generator_ver}".encode()
     digest = hashlib.sha256(raw).digest()
-    return int.from_bytes(digest[:8], "big", signed=False)
+    # Mask to 63 bits so the value always fits in PostgreSQL's signed
+    # bigint column. We accept that ~half of all dates lose one bit of
+    # entropy; a 63-bit space is still 9.2 × 10^18, more than enough
+    # for an unbounded date range.
+    return int.from_bytes(digest[:8], "big", signed=False) & ((1 << 63) - 1)
 
 
 def rng(seed: int, salt: str = "") -> random.Random:
