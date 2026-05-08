@@ -1,4 +1,4 @@
-import { publicUrl, recordPlay } from "./api.js";
+import { publicUrl, recordPlay, updateSongNotes } from "./api.js";
 import * as Tone from "https://esm.sh/tone@14.8.49";
 import { Midi } from "https://esm.sh/@tonejs/midi@2.0.28";
 
@@ -757,6 +757,7 @@ export class DetailPanel {
     this.root        = root;
     this.dateEl      = root.querySelector("#detail-date");
     this.metaEl      = root.querySelector("#detail-meta");
+    this.createdEl   = root.querySelector("#detail-created");
     this.variantsEl  = root.querySelector("#detail-variants");
     this.scoreEl     = root.querySelector("#detail-score");
     this.scoreEmpty  = root.querySelector("#detail-score-empty");
@@ -767,10 +768,20 @@ export class DetailPanel {
     this.playBtn     = root.querySelector("#play-btn");
     this.progressEl  = root.querySelector("#play-progress");
     this.timeEl      = root.querySelector("#play-time");
+    this.titleInput  = root.querySelector("#detail-title");
+    this.notesInput  = root.querySelector("#detail-notes");
+    this.memoStatus  = root.querySelector("#detail-memo-status");
 
     this.midi = null;
     this.duration = 0;
     this.tickHandle = null;
+    this._memoTimer = null;
+    this._memoLast  = "";
+
+    this.titleInput.addEventListener("input",  () => this._scheduleMemoSave());
+    this.titleInput.addEventListener("blur",   () => this._flushMemoSave());
+    this.notesInput.addEventListener("input",  () => this._scheduleMemoSave());
+    this.notesInput.addEventListener("blur",   () => this._flushMemoSave());
 
     root.querySelector("#detail-close").addEventListener("click", () => this.close());
     root.addEventListener("click", (e) => { if (e.target === root) this.close(); });
@@ -788,11 +799,14 @@ export class DetailPanel {
   }
 
   open(song, variants = null) {
+    this._flushMemoSave();           // commit any unsaved typing
     this.song = song;
     this.variants = variants && variants.length ? variants : [song];
     this.dateEl.textContent = formatDate(song.date);
     this.metaEl.textContent = fmtMeta(song);
+    this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
     this.renderVariantChips();
+    this.renderMemo(song);
 
     const svgUrl = publicUrl(song.paths?.svg);
     this.scoreEl.innerHTML = "";
@@ -977,9 +991,12 @@ export class DetailPanel {
   }
 
   swapTo(song) {
+    this._flushMemoSave();
     this.stop();
     this.song = song;
     this.metaEl.textContent = fmtMeta(song);
+    this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
+    this.renderMemo(song);
 
     const svgUrl = publicUrl(song.paths?.svg);
     this.scoreEl.innerHTML = "";
@@ -997,6 +1014,58 @@ export class DetailPanel {
     this.renderDownloads(song.paths);
     this.renderVariantChips();
     this.setVariant("short");
+  }
+
+  // ── memo (title + notes) ──────────────────────────────────────
+  renderMemo(song) {
+    this.titleInput.value = song?.title || "";
+    this.notesInput.value = song?.notes || "";
+    this._memoLast = this._memoSnapshot();
+    if (song?.notes_updated_at) {
+      this.memoStatus.textContent = `${formatRelative(song.notes_updated_at)} 저장됨`;
+    } else {
+      this.memoStatus.textContent = "메모는 자동 저장됩니다";
+    }
+  }
+
+  _memoSnapshot() {
+    return JSON.stringify({
+      title: this.titleInput.value, notes: this.notesInput.value,
+    });
+  }
+
+  _scheduleMemoSave() {
+    if (!this.song) return;
+    if (this._memoTimer) clearTimeout(this._memoTimer);
+    this.memoStatus.textContent = "저장 중…";
+    this._memoTimer = setTimeout(() => this._flushMemoSave(), 1500);
+  }
+
+  async _flushMemoSave() {
+    if (this._memoTimer) {
+      clearTimeout(this._memoTimer);
+      this._memoTimer = null;
+    }
+    if (!this.song) return;
+    const snap = this._memoSnapshot();
+    if (snap === this._memoLast) return;     // no change
+    const songId = this.song.id;
+    try {
+      const updated = await updateSongNotes(songId, {
+        title: this.titleInput.value,
+        notes: this.notesInput.value,
+      });
+      this._memoLast = snap;
+      if (this.song && this.song.id === songId && updated) {
+        this.song.title = updated.title;
+        this.song.notes = updated.notes;
+        this.song.notes_updated_at = updated.notes_updated_at;
+        this.memoStatus.textContent = "방금 저장됨";
+      }
+    } catch (err) {
+      console.error("[memo] save failed:", err);
+      this.memoStatus.textContent = "저장 실패";
+    }
   }
 
   renderWeather(w) {
@@ -1043,4 +1112,30 @@ function formatDate(iso) {
   const date = new Date(y, m - 1, d);
   const month = date.toLocaleString("en-US", { month: "long" });
   return `${month} ${d}, ${y}`;
+}
+
+function formatCreated(iso, variantId) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  // Always render in KST regardless of viewer timezone.
+  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const Y = kst.getUTCFullYear();
+  const M = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const D = String(kst.getUTCDate()).padStart(2, "0");
+  const hh = String(kst.getUTCHours()).padStart(2, "0");
+  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+  const tag = variantId === "auto" ? "자동" : "수동";
+  return `${tag}  ${Y}.${M}.${D} ${hh}:${mm} KST 생성`;
+}
+
+function formatRelative(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60)    return "방금";
+  if (diff < 3600)  return `${Math.round(diff / 60)}분 전`;
+  if (diff < 86400) return `${Math.round(diff / 3600)}시간 전`;
+  return `${Math.round(diff / 86400)}일 전`;
 }

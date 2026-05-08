@@ -20,7 +20,8 @@ export function publicUrl(path) {
 const SONG_COLS =
   "id, city_id, date, variant_id, intent_id, instrument_id, " +
   "key_root, mode, genre, bpm, meter, duration_short_sec, " +
-  "duration_long_sec, weather, paths, created_at";
+  "duration_long_sec, weather, paths, title, notes, " +
+  "notes_updated_at, created_at";
 
 // Order so 'auto' shows first, then user variants by created_at desc.
 function _sortVariants(rows) {
@@ -106,4 +107,20 @@ export async function recordPlay(songId, variant) {
     variant,
     completed: false,
   });
+}
+
+// Patch a song's title/notes. Returns the updated row (or throws on
+// failure). Caller is expected to debounce; we don't.
+export async function updateSongNotes(songId, { title, notes }) {
+  const patch = { notes_updated_at: new Date().toISOString() };
+  if (title !== undefined) patch.title = (title || "").trim() || null;
+  if (notes !== undefined) patch.notes = (notes || "").trim() || null;
+  const { data, error } = await supabase
+    .from("songs")
+    .update(patch)
+    .eq("id", songId)
+    .select(SONG_COLS)
+    .limit(1);
+  if (error) throw error;
+  return (data && data[0]) || null;
 }

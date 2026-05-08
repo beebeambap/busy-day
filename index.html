@@ -103,6 +103,7 @@
       <header class="detail-head">
         <h3 id="detail-date">—</h3>
         <p id="detail-meta" class="muted">—</p>
+        <p id="detail-created" class="muted small">—</p>
         <div id="detail-variants" class="variant-chips" hidden></div>
       </header>
 
@@ -125,6 +126,14 @@
       </div>
 
       <dl id="detail-weather" class="weather"></dl>
+
+      <section class="memo">
+        <input id="detail-title" type="text" maxlength="80"
+               placeholder="제목 (선택) — 예: 비 오는 화요일">
+        <textarea id="detail-notes" rows="3" maxlength="800"
+                  placeholder="이 곡에 대한 짧은 메모…"></textarea>
+        <p id="detail-memo-status" class="muted small">—</p>
+      </section>
 
       <ul class="downloads" id="detail-downloads"></ul>
     </div>
