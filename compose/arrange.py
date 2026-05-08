@@ -22,10 +22,10 @@ from random import Random
 
 from . import GENERATOR_VER
 from .comping import (
-    bass_pattern,
+    bass_pattern_for,
     bass_pitch as _bass_pitch,
     chord_subset,
-    harmony_pattern,
+    harmony_pattern_for,
     percussion_pattern,
 )
 from .features import Features
@@ -262,7 +262,9 @@ def compose_ir(
             })
         else:
             har_base_vel = 56 + int(rng.uniform(-3, 3))
-            for off, dur, kind, vel_mult in harmony_pattern(genre, meter):
+            for off, dur, kind, vel_mult in harmony_pattern_for(
+                genre, meter, section, rng,
+            ):
                 pitches = chord_subset(full_chord, kind)
                 if not pitches:
                     continue
@@ -288,7 +290,9 @@ def compose_ir(
                 "vel": 50,
             })
         else:
-            for off, dur, kind in bass_pattern(genre, meter):
+            for off, dur, kind in bass_pattern_for(
+                genre, meter, section, rng,
+            ):
                 pitch = _bass_pitch(degree_to_midi, key, mode,
                                     chord_root, kind)
                 if not (24 <= pitch <= 60):
