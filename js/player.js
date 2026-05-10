@@ -716,11 +716,24 @@ function _slug(s) {
     .replace(/^-+|-+$/g, "");
 }
 
+function _kstHHMMTag(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  // KST regardless of viewer timezone. Colon is not filename-safe so
+  // we render HH-MM with a hyphen.
+  const kst = new Date(d.getTime() + 9 * 3600 * 1000);
+  const hh = String(kst.getUTCHours()).padStart(2, "0");
+  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+  return `${hh}-${mm}`;
+}
+
 function buildDownloadName(song, suffix) {
-  const date = song.date || "song";
+  const date    = song.date || "song";
+  const time    = _kstHHMMTag(song.created_at);
   const weather = _weatherTag(song.weather);
-  const genre = _slug(song.genre);
-  const parts = ["busy-day", date, weather, genre]
+  const genre   = _slug(song.genre);
+  const parts = ["busy-day", date, time, weather, genre]
     .filter((p) => p && p.length);
   return `${parts.join("_")}_${suffix}`;
 }
