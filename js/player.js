@@ -1128,21 +1128,52 @@ export class DetailPanel {
       const filename = buildDownloadName(this.song, suffix);
       const li = document.createElement("li");
       const a = document.createElement("a");
-      // Native click — browser decides "open in tab" (svg/json) vs
-      // "download" (mid/musicxml) per file type. Cross-origin means
-      // the `download` attribute name is ignored for the actual saved
-      // filename; we still set it as a hint and surface the intended
-      // name in the title tooltip.
       a.href = url;
       a.download = filename;
-      a.target = "_blank";
-      a.rel = "noopener";
       a.title = filename;
       a.textContent = label;
+
+      // Hybrid: binary downloads (mid/wav/mp3/musicxml) intercept with
+      // fetch+blob so the saved filename matches our naming. View-
+      // friendly assets (svg/json) keep the native click so the
+      // browser opens them in a tab — that was the user's preferred
+      // behaviour for previewable formats.
+      const ext = (suffix.split(".").pop() || "").toLowerCase();
+      const FORCE_DOWNLOAD = new Set(["mid", "midi", "wav", "mp3", "musicxml"]);
+
+      if (FORCE_DOWNLOAD.has(ext)) {
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          downloadAsBlob(url, filename).catch((err) => {
+            console.warn("[download] blob failed:", err);
+            window.open(url, "_blank");
+          });
+        });
+      } else {
+        a.target = "_blank";
+        a.rel = "noopener";
+      }
+
       li.appendChild(a);
       this.downloadsEl.appendChild(li);
     }
   }
+}
+
+async function downloadAsBlob(url, filename) {
+  const r = await fetch(url, { mode: "cors", credentials: "omit" });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const blob = await r.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(objUrl);
+    a.remove();
+  }, 1000);
 }
 
 function formatDate(iso) {
