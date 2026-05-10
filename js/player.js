@@ -2,6 +2,43 @@ import { publicUrl, recordPlay, updateSongNotes } from "./api.js";
 import * as Tone from "https://esm.sh/tone@14.8.49";
 import { Midi } from "https://esm.sh/@tonejs/midi@2.0.28";
 
+// ── master output chain ─────────────────────────────────────────
+// Web playback was too quiet vs. native apps (~-25 LUFS). We route
+// everything through a master compressor + makeup gain + limiter so
+// the perceived loudness lands closer to streaming-style mastering
+// without ever clipping the speakers.
+//
+//   <every voice> → MASTER (compressor) → gain +10dB → limiter -0.5 → speakers
+//
+// `toMaster(node)` is a drop-in for the old `.toDestination()`.
+
+let MASTER = null;
+let _masterReady = false;
+
+function _initMaster() {
+  if (_masterReady) return;
+  const comp = new Tone.Compressor({
+    threshold: -18,
+    ratio:     3,
+    attack:    0.005,
+    release:   0.18,
+    knee:      6,
+  });
+  const makeup  = new Tone.Gain(Tone.dbToGain(10));
+  const limiter = new Tone.Limiter(-0.5);
+  comp.connect(makeup);
+  makeup.connect(limiter);
+  limiter.toDestination();
+  MASTER = comp;
+  _masterReady = true;
+}
+_initMaster();
+
+function toMaster(node) {
+  node.connect(MASTER);
+  return node;
+}
+
 const WEATHER_LABELS = {
   temp_c: "기온",
   temp_range: "일교차",
@@ -265,7 +302,7 @@ function makeStringPad(volume) {
 // a featured layer. Routed dry (no reverb) so the pulse stays crisp.
 
 function makePercussion() {
-  const out = new Tone.Gain(0.85).toDestination();
+  const out = toMaster(new Tone.Gain(0.85));
 
   const tap = new Tone.MembraneSynth({
     pitchDecay: 0.005,
@@ -429,7 +466,7 @@ function _makeRain(volumeDb, intensity = 0.5) {
     rolloff: -24,
     Q: 0.5,
   });
-  const gain = new Tone.Gain(0).toDestination();
+  const gain = toMaster(new Tone.Gain(0));
   noise.chain(filt, gain);
   noise.start();
   gain.gain.rampTo(Tone.dbToGain(volumeDb), 1.5);
@@ -453,7 +490,7 @@ function _makeWind(volumeDb, intensity = 0.5) {
     frequency: 0.15 + intensity * 0.2, min: 200, max: 1500, type: "sine",
   });
   lfo.connect(filt.frequency);
-  const gain = new Tone.Gain(0).toDestination();
+  const gain = toMaster(new Tone.Gain(0));
   noise.chain(filt, gain);
   noise.start();
   lfo.start();
@@ -479,7 +516,8 @@ function _makeBirds(volumeDb, density = 0.35) {
       attack: 0.001, decay: 0.06, sustain: 0, release: 0.05,
     },
     volume: volumeDb,
-  }).toDestination();
+  });
+  toMaster(synth);
 
   const NOTES = ["A6", "B6", "C7", "D7", "E7", "G7"];
   const loop = new Tone.Loop((time) => {
@@ -505,7 +543,7 @@ function _makeIndoor(volumeDb) {
   const drone = new Tone.Oscillator(46, "sine"); // ~A#1
   const noise = new Tone.Noise("brown");
   const filt  = new Tone.Filter({ frequency: 350, type: "lowpass" });
-  const gain  = new Tone.Gain(0).toDestination();
+  const gain  = toMaster(new Tone.Gain(0));
   drone.connect(gain);
   noise.connect(filt); filt.connect(gain);
   drone.start(); noise.start();
@@ -524,7 +562,7 @@ function _makeIndoor(volumeDb) {
 function _makeHum(volumeDb) {
   const a = new Tone.Oscillator(41, "sine"); // E1
   const b = new Tone.Oscillator(48, "sine"); // C2
-  const gain = new Tone.Gain(0).toDestination();
+  const gain = toMaster(new Tone.Gain(0));
   a.connect(gain); b.connect(gain);
   a.start(); b.start();
   gain.gain.rampTo(Tone.dbToGain(volumeDb), 2.5);
@@ -567,7 +605,7 @@ function stopAmbience() {
 }
 
 function buildInstruments(genre, instrumentId) {
-  const reverb = new Tone.Reverb({ decay: 3.6, wet: 0.34 }).toDestination();
+  const reverb = toMaster(new Tone.Reverb({ decay: 3.6, wet: 0.34 }));
   const ready  = [reverb.generate()];
   let needsSamples = false;       // becomes true if any voice uses Salamander
 
@@ -610,12 +648,12 @@ function buildInstruments(genre, instrumentId) {
 
   // ── bass per genre.
   if (genre === "jazz_ballad") {
-    bass = makeUprightBass(-12).toDestination();
+    bass = toMaster(makeUprightBass(-12));
   } else if (genre === "bossa_nova") {
-    bass = makeUprightBass(-10).toDestination();
+    bass = toMaster(makeUprightBass(-10));
   } else {
     const release = PIANO_RELEASE[genre] ?? 2.0;
-    bass = makePiano(release * 0.7, -10).toDestination();
+    bass = toMaster(makePiano(release * 0.7, -10));
     needsSamples = true;
   }
 
