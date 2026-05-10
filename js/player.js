@@ -161,18 +161,21 @@ function makeStrings(volume) {
 }
 
 function makeMusicBox(volume) {
-  // Bell-like FM with inharmonic ratio (3.01) so it rings rather than
-  // hums. Construction kept minimal because Tone.PolySynth in v14 has
-  // known quirks propagating nested oscillator/modulation options into
-  // each voice. We pass only flat options + envelopes and set the
-  // master volume on the synth's own .volume.value.
-  const synth = new Tone.PolySynth(Tone.FMSynth, {
-    harmonicity: 3.01,
-    modulationIndex: 14,
-    envelope: { attack: 0.002, decay: 1.8, sustain: 0.05, release: 1.8 },
-    modulationEnvelope: {
-      attack: 0.005, decay: 0.6, sustain: 0.0, release: 0.4,
+  // Bell / music-box character without going through PolySynth's
+  // FMSynth voice wrapping (which has been silently dropping options
+  // in v14.8.49 and leaving the voice mute). Use the regular
+  // Tone.Synth voice and put the FM character into the *oscillator*
+  // type instead — Tone supports `fmsine` etc. which build the FM
+  // synthesis directly into the oscillator without depending on
+  // PolySynth nested-option propagation.
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: {
+      type:            "fmsine",
+      modulationType:  "sine",
+      harmonicity:     3.01,    // inharmonic = bell-like
+      modulationIndex: 4,
     },
+    envelope: { attack: 0.001, decay: 1.4, sustain: 0.0, release: 1.4 },
   });
   synth.volume.value = volume;
   return synth;
@@ -705,6 +708,17 @@ function _slug(s) {
     .replace(/^-+|-+$/g, "");
 }
 
+// Title slug preserves Korean / non-ASCII characters but strips
+// filesystem-unsafe ones and collapses whitespace into hyphens.
+function _titleSlug(s) {
+  return String(s ?? "")
+    .trim()
+    .replace(/[\\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
 function _kstHHMMTag(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -718,11 +732,18 @@ function _kstHHMMTag(iso) {
 }
 
 function buildDownloadName(song, suffix) {
+  // Format:  <date>_<time>_<weather>_<genre>[_<title>]_<kind>.<ext>
+  // - "busy-day" prefix removed (per user request)
+  // - time always present when created_at is set
+  // - title appended if the user typed one in the memo field; Korean
+  //   characters are preserved, only filesystem-unsafe punctuation is
+  //   stripped.
   const date    = song.date || "song";
   const time    = _kstHHMMTag(song.created_at);
   const weather = _weatherTag(song.weather);
   const genre   = _slug(song.genre);
-  const parts = ["busy-day", date, time, weather, genre]
+  const title   = _titleSlug(song.title);
+  const parts = [date, time, weather, genre, title]
     .filter((p) => p && p.length);
   return `${parts.join("_")}_${suffix}`;
 }
