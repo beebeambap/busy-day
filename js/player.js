@@ -105,62 +105,51 @@ function makeNylon(volume) {
   });
 }
 
-function _bowedStringSynth({ harmonicity, attack, sustain, release,
-                              modAttack, modDecay, modSustain, modRelease,
-                              volume, vibratoFreq, vibratoDepth }) {
-  // Common bowed-string body: AMSynth voice with sawtooth carrier,
-  // plus a master-rate vibrato LFO modulating detune for the breathing
-  // characteristic of real strings.
+function _bowedStringSynth({ harmonicity, attack, release, volume }) {
+  // AMSynth voice with envelope shaped like a quick bow start. We
+  // intentionally drop the LFO-driven vibrato that was here before:
+  // (a) Tone.LFO.connect(PolySynth.detune) is fragile in Tone v14 and
+  //     was sometimes leaving the voice silent, and
+  // (b) the long attack times the previous version used to "feel
+  //     bowed" pushed every onset 200-450 ms behind the beat.
+  // Distinct tonal character is handled by harmonicity instead.
   const synth = new Tone.PolySynth(Tone.AMSynth, {
     harmonicity,
-    envelope: { attack, decay: 0.3, sustain, release },
+    envelope: { attack, decay: 0.25, sustain: 0.80, release },
     modulationEnvelope: {
-      attack: modAttack, decay: modDecay,
-      sustain: modSustain, release: modRelease,
+      attack: 0.01, decay: 0.15, sustain: 0.80, release: 0.4,
     },
   });
   synth.volume.value = volume;
-  if (vibratoFreq && vibratoDepth) {
-    const vib = new Tone.LFO({
-      frequency: vibratoFreq,
-      type: "sine",
-      min: -vibratoDepth,
-      max: +vibratoDepth,
-    }).start();
-    vib.connect(synth.detune);
-  }
   return synth;
 }
 
 function makeViolin(volume) {
-  // Bright, fast vibrato. Sits one octave above viola.
+  // Bright (high harmonicity, lots of upper sidebands), fast bow.
   return _bowedStringSynth({
-    harmonicity: 2,
-    attack: 0.18, sustain: 0.85, release: 1.0,
-    modAttack: 0.2, modDecay: 0.2, modSustain: 0.7, modRelease: 0.8,
-    vibratoFreq: 5.5, vibratoDepth: 8,   // ±8 cents
+    harmonicity: 3,
+    attack: 0.04,    // 40 ms — quick bow start, lands on the beat
+    release: 0.6,
     volume,
   });
 }
 
 function makeViola(volume) {
-  // Warmer mid-range body, mellower vibrato.
+  // Mid range, slightly slower bow.
   return _bowedStringSynth({
-    harmonicity: 1.5,
-    attack: 0.30, sustain: 0.85, release: 1.4,
-    modAttack: 0.3, modDecay: 0.2, modSustain: 0.7, modRelease: 1.0,
-    vibratoFreq: 4.5, vibratoDepth: 6,
+    harmonicity: 2,
+    attack: 0.06,    // 60 ms
+    release: 0.7,
     volume,
   });
 }
 
 function makeCello(volume) {
-  // Deep, slow bow, generous resonance.
+  // Warm, deeper body. Still under one 16th-note at 80 BPM (188 ms).
   return _bowedStringSynth({
     harmonicity: 1,
-    attack: 0.45, sustain: 0.85, release: 1.8,
-    modAttack: 0.4, modDecay: 0.3, modSustain: 0.7, modRelease: 1.4,
-    vibratoFreq: 3.5, vibratoDepth: 5,
+    attack: 0.08,    // 80 ms
+    release: 0.85,
     volume,
   });
 }
