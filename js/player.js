@@ -195,16 +195,51 @@ function makeHorn(volume) {
   });
 }
 
+// Lightweight facade so we can route a synth through an effect chain
+// while still presenting Tone's triggerAttackRelease / connect surface
+// to the rest of the code.
+function _withEffectChain(synth, outputNode) {
+  return {
+    triggerAttackRelease(...args) {
+      return synth.triggerAttackRelease(...args);
+    },
+    connect(dest)    { outputNode.connect(dest); return this; },
+    disconnect()     { try { outputNode.disconnect(); } catch {} return this; },
+    get volume()     { return synth.volume; },
+  };
+}
+
 function makeFlute(volume) {
-  // Breathy woodwind: triangle harmonics + slow attack + steady body.
-  // Built on Tone.Synth (reliable) with a triangle8 oscillator so the
-  // tone has a hollow, fluty character without samples.
+  // Breathy woodwind: AM-sine carrier (warmer than a plain sine, less
+  // edge than triangle8) + Vibrato for the bow-wobble + Chorus for the
+  // slight doubling that real flutes get from room ambience. Slower
+  // attack so each note has a perceptible "breath start" instead of a
+  // hard onset.
   const synth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: "triangle8" },
-    envelope: { attack: 0.12, decay: 0.25, sustain: 0.80, release: 0.5 },
+    oscillator: {
+      type:           "amsine",
+      harmonicity:    1.5,
+      modulationType: "sine",
+    },
+    envelope: { attack: 0.22, decay: 0.30, sustain: 0.78, release: 0.6 },
   });
   synth.volume.value = volume;
-  return synth;
+
+  const vibrato = new Tone.Vibrato({
+    frequency: 5.0,
+    depth:     0.04,         // ±~7 cents — gentle wobble
+  });
+  const chorus = new Tone.Chorus({
+    frequency: 1.4,
+    delayTime: 4,
+    depth:     0.5,
+    feedback:  0.08,
+    spread:    180,
+    wet:       0.5,
+  }).start();
+
+  synth.chain(vibrato, chorus);
+  return _withEffectChain(synth, chorus);
 }
 
 function makeMarimba(volume) {

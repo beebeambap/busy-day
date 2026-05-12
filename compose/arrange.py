@@ -380,12 +380,31 @@ def compose_ir(
         acc += sec_len[s]
     outro_start_bar = total_bars - sec_len["OUTRO"]
 
+    # Right hand (melody) gets the full dynamic arch.
     apply_velocity_curve(
         melody_events, rng,
         section_breaks=section_break_bars,
     )
     apply_outro_decay(melody_events, outro_start_bar)
     apply_micro_timing(melody_events, rng, jitter_beats=0.018)
+
+    # Left hand (harmony + bass) gets a subtler arch — same phrase
+    # boundaries, smaller span. Without this every bar's chord and
+    # bass had the same loudness, so the left hand sounded mechanical
+    # next to the melody.
+    apply_velocity_curve(
+        harmony_events, rng,
+        base=44, span=22, jitter=4,
+        section_breaks=section_break_bars,
+    )
+    apply_outro_decay(harmony_events, outro_start_bar)
+
+    apply_velocity_curve(
+        bass_events, rng,
+        base=52, span=20, jitter=4,
+        section_breaks=section_break_bars,
+    )
+    apply_outro_decay(bass_events, outro_start_bar)
 
     pedals = pedal_segments(
         genre=genre, total_bars=total_bars, bpb=bpb, chord_seq=chord_seq,
