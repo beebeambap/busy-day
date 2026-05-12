@@ -44,8 +44,13 @@ def chord_pitches(
     base_octave: int = 3,
     spread: str = "default",
 ) -> list[int]:
-    """Build a triad/seventh from a scale degree using mode-diatonic stacking.
+    """Build a chord voicing from a scale degree using mode-diatonic stacking.
 
+    Voicing kinds:
+      "triad"      : root + 3rd + 5th
+      "seventh"    : triad + 7th
+      "open_fifth" : root + 5th (no third) — the "ancient/modal" Celtic
+                     drone voicing the Muji store BGM leans on heavily
     `spread` controls the voicing's vertical span — a Muji-leaning lever
     we use to map ambient temperature to perceived warmth:
       "tight"   : everything in the same octave (cold days; close-knit)
@@ -56,12 +61,16 @@ def chord_pitches(
     root = degree_to_midi(key_root, mode, degree, base_octave=base_octave)
     third = degree_to_midi(key_root, mode, degree + 2, base_octave=base_octave)
     fifth = degree_to_midi(key_root, mode, degree + 4, base_octave=base_octave)
-    pitches = [root, third, fifth]
-    if voicing == "seventh":
-        pitches.append(degree_to_midi(key_root, mode, degree + 6,
-                                      base_octave=base_octave))
 
-    if spread == "wide" and len(pitches) >= 3:
+    if voicing == "open_fifth":
+        pitches = [root, fifth]
+    else:
+        pitches = [root, third, fifth]
+        if voicing == "seventh":
+            pitches.append(degree_to_midi(key_root, mode, degree + 6,
+                                          base_octave=base_octave))
+
+    if spread == "wide" and len(pitches) >= 2:
         pitches = list(pitches)
         pitches[0]  = pitches[0] - 12
         pitches[-1] = pitches[-1] + 12

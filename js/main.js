@@ -43,10 +43,12 @@ const INSTRUMENTS = [
   { id: "violin",    label: "바이올린",   icon: "🎻", sub: "고음현" },
   { id: "viola",     label: "비올라",     icon: "🎻", sub: "중음현" },
   { id: "cello",     label: "첼로",       icon: "🎻", sub: "저음현" },
-  { id: "flute",     label: "플루트",     icon: "🎵", sub: "목관" },
-  { id: "marimba",   label: "마림바",     icon: "🥁", sub: "말렛" },
-  { id: "music_box", label: "음악 상자",  icon: "🔔", sub: "셀레스타" },
-  { id: "horn",      label: "호른",       icon: "📯", sub: "프렌치 혼" },
+  { id: "flute",       label: "플루트",     icon: "🎵", sub: "목관" },
+  { id: "tin_whistle", label: "틴 휘슬",    icon: "🎶", sub: "아일랜드 휘슬" },
+  { id: "harp",        label: "하프",       icon: "🎶", sub: "현악·플럭" },
+  { id: "marimba",     label: "마림바",     icon: "🥁", sub: "말렛" },
+  { id: "music_box",   label: "음악 상자",  icon: "🔔", sub: "셀레스타" },
+  { id: "horn",        label: "호른",       icon: "📯", sub: "프렌치 혼" },
 ];
 
 function todayKST() {

@@ -144,6 +144,12 @@ def pick_motif(
         if "wide_leap" in tags:      s += 0.4 * f.brightness
         if "ostinato" in tags:       s += 0.3 * f.calmness
         if "question_answer" in tags:s += 0.3 * (1.0 - f.calmness)
+        # Celtic / pentatonic motifs are the Muji-store sound; they
+        # always sit a little above neutral so they have a real chance
+        # of being picked even when other tags are neutral too.
+        if "celtic" in tags:         s += 0.5
+        if "pentatonic" in tags:     s += 0.3 * f.brightness
+        if "lilting" in tags:        s += 0.3 * (1.0 - f.wetness)
         if m["id"] in avoid_ids:
             s *= 0.05
         return max(s, 0.01)

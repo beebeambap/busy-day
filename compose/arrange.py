@@ -32,6 +32,7 @@ from .features import Features
 from .harmony import progression, voicing_for_genre
 from .progressions import progression_for_intent
 from .humanize import (
+    apply_grace_notes,
     apply_micro_timing,
     apply_outro_decay,
     apply_velocity_curve,
@@ -248,15 +249,25 @@ def compose_ir(
         # ── harmony comping (rhythmic left hand). Final bar is forced
         #    to tonic + sustained ring-out so the piece breathes shut.
         chord_for_harmony = 1 if is_final else chord_root
-        # B-section colour: 30% chance of promoting a triad bar to a
-        # seventh voicing for an extra harmonic shade. Jazz/bossa
-        # already use seventh by default so this only paints the
-        # piano-led genres. Leave the final bar at the genre default
-        # so the closing chord rings cleanly.
+        # Per-bar voicing colour:
+        # - B-section: 30% chance triad → seventh (extra colour)
+        # - folk + 6/8 INTRO/A: lean into Celtic open-fifth drones
+        #   (the "ancient modal" Muji-Celtic sound)
+        # - ambient: ~25% open_fifth so the pad opens up sometimes
+        # Final bar always uses the genre default so the closer rings.
         bar_voicing = voicing
-        if not is_final and section == "B" and voicing == "triad":
-            if rng.random() < 0.30:
-                bar_voicing = "seventh"
+        if not is_final:
+            if section == "B" and voicing == "triad":
+                if rng.random() < 0.30:
+                    bar_voicing = "seventh"
+            celtic_zone = (genre == "folk" and meter == "6/8"
+                           and section in ("INTRO", "A", "OUTRO"))
+            if celtic_zone and voicing == "triad" and rng.random() < 0.55:
+                bar_voicing = "open_fifth"
+            elif genre == "ambient" and voicing == "triad" \
+                    and section != "B" and rng.random() < 0.25:
+                bar_voicing = "open_fifth"
+
         full_chord = chord_pitches(key, mode, chord_for_harmony,
                                    voicing=bar_voicing, base_octave=3,
                                    spread=voicing_spread)
@@ -387,6 +398,11 @@ def compose_ir(
     )
     apply_outro_decay(melody_events, outro_start_bar)
     apply_micro_timing(melody_events, rng, jitter_beats=0.018)
+    # Celtic/Muji-style ornament: 1/16 grace note on ~15% of held
+    # melody notes. Folk leans into it more (real ornamentation
+    # tradition), other genres get a lighter dose.
+    grace_prob = 0.22 if genre == "folk" else 0.10
+    melody_events = apply_grace_notes(melody_events, rng, prob=grace_prob)
 
     # Left hand (harmony + bass) gets a subtler arch — same phrase
     # boundaries, smaller span. Without this every bar's chord and

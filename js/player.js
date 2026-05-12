@@ -258,6 +258,36 @@ function makeMarimba(volume) {
   return synth;
 }
 
+function makeTinWhistle(volume) {
+  // Bright Irish whistle: AM-triangle gives a hollow, breathy tone
+  // with a fast attack so jigs sit on the beat, plus a gentle vibrato
+  // for the wobble that real whistles get when held.
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: {
+      type:           "amtriangle",
+      harmonicity:    1.2,
+      modulationType: "sine",
+    },
+    envelope: { attack: 0.04, decay: 0.18, sustain: 0.82, release: 0.35 },
+  });
+  synth.volume.value = volume;
+  const vibrato = new Tone.Vibrato({ frequency: 5.5, depth: 0.05 });
+  synth.chain(vibrato);
+  return _withEffectChain(synth, vibrato);
+}
+
+function makeHarp(volume) {
+  // Celtic harp: PluckSynth with softer attack noise and lighter
+  // dampening so notes ring out long, like a concert harp.
+  const synth = new Tone.PolySynth(Tone.PluckSynth, {
+    attackNoise: 0.30,
+    dampening:   3400,
+    resonance:   0.98,
+  });
+  synth.volume.value = volume;
+  return synth;
+}
+
 // instrument_id (user override) -> factory(reverbBus) returning the
 // melody synth already routed to the bus. Returning null = no override,
 // fall back to the genre-derived melody.
@@ -265,16 +295,18 @@ function makeMarimba(volume) {
 // because Tone's `connect` returns the source in v14 but tooling
 // changes have bitten us before. Be explicit.
 const INSTRUMENT_FACTORIES = {
-  piano:     (reverb) => { const s = makePiano(2.4, -4); s.connect(reverb); return s; },
-  rhodes:    (reverb) => { const s = makeRhodes(-10);    s.connect(reverb); return s; },
-  nylon:     (reverb) => { const s = makeNylon(-8);      s.connect(reverb); return s; },
-  violin:    (reverb) => { const s = makeViolin(-10);    s.connect(reverb); return s; },
-  viola:     (reverb) => { const s = makeViola(-9);      s.connect(reverb); return s; },
-  cello:     (reverb) => { const s = makeCello(-8);      s.connect(reverb); return s; },
-  strings:   (reverb) => { const s = makeStrings(-10);   s.connect(reverb); return s; },
-  flute:     (reverb) => { const s = makeFlute(-8);      s.connect(reverb); return s; },
-  marimba:   (reverb) => { const s = makeMarimba(-6);    s.connect(reverb); return s; },
-  music_box: (reverb) => { const s = makeMusicBox(-4);   s.connect(reverb); return s; },
+  piano:       (reverb) => { const s = makePiano(2.4, -4);  s.connect(reverb); return s; },
+  rhodes:      (reverb) => { const s = makeRhodes(-10);     s.connect(reverb); return s; },
+  nylon:       (reverb) => { const s = makeNylon(-8);       s.connect(reverb); return s; },
+  violin:      (reverb) => { const s = makeViolin(-10);     s.connect(reverb); return s; },
+  viola:       (reverb) => { const s = makeViola(-9);       s.connect(reverb); return s; },
+  cello:       (reverb) => { const s = makeCello(-8);       s.connect(reverb); return s; },
+  strings:     (reverb) => { const s = makeStrings(-10);    s.connect(reverb); return s; },
+  flute:       (reverb) => { const s = makeFlute(-8);       s.connect(reverb); return s; },
+  tin_whistle: (reverb) => { const s = makeTinWhistle(-8);  s.connect(reverb); return s; },
+  harp:        (reverb) => { const s = makeHarp(-6);        s.connect(reverb); return s; },
+  marimba:     (reverb) => { const s = makeMarimba(-6);     s.connect(reverb); return s; },
+  music_box:   (reverb) => { const s = makeMusicBox(-4);    s.connect(reverb); return s; },
   horn:      (reverb) => { const s = makeHorn(-10);      s.connect(reverb); return s; },
 };
 
@@ -661,7 +693,62 @@ function stopAmbience() {
   _ambVoices = [];
 }
 
-function buildInstruments(genre, instrumentId) {
+// Harmony / bass voice palette per genre. Per-song variation makes
+// "same genre, different day" actually sound different on the left
+// hand. Each entry is a (synth-builder, volume_dB) tuple; the picker
+// hashes the song to choose one deterministically.
+
+const HARMONY_PALETTE = {
+  folk:           ["am_pad", "harp_soft", "nylon_pad"],
+  ambient:        ["am_pad", "string_pad", "harp_soft"],
+  neo_classical:  ["string_pad", "am_pad"],
+  lo_fi:          ["am_pad"],
+  jazz_ballad:    ["rhodes_pad"],
+  bossa_nova:     ["nylon_pad"],
+};
+
+const BASS_PALETTE = {
+  folk:           ["piano_low", "harp_low"],
+  ambient:        ["piano_low", "harp_low"],
+  neo_classical:  ["piano_low"],
+  lo_fi:          ["piano_low"],
+  jazz_ballad:    ["upright"],
+  bossa_nova:     ["upright"],
+};
+
+function _djb2(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function _paletteKey(song) {
+  if (!song) return "0";
+  // seed comes from Postgres bigint and may be a JS string; date is
+  // stable; combine for an order-independent key.
+  return `${song.seed || ""}|${song.date || ""}|${song.variant_id || ""}`;
+}
+
+function _buildHarmonyVoice(kind, reverb) {
+  switch (kind) {
+    case "string_pad": return makeStringPad(-18).connect(reverb);
+    case "harp_soft": { const s = makeHarp(-14); s.connect(reverb); return s; }
+    case "nylon_pad":  return makeNylon(-14).connect(reverb);
+    case "rhodes_pad": return makeRhodes(-18).connect(reverb);
+    case "am_pad":
+    default:           return makeAMPad(-22).connect(reverb);
+  }
+}
+
+function _buildBassVoice(kind) {
+  switch (kind) {
+    case "harp_low":   return toMaster(makeHarp(-12));
+    case "upright":    return toMaster(makeUprightBass(-12));
+    case "piano_low":
+    default:           return toMaster(makePiano(1.4, -10));
+  }
+}
+
+function buildInstruments(genre, instrumentId, song) {
   const reverb = toMaster(new Tone.Reverb({ decay: 3.6, wet: 0.34 }));
   const ready  = [reverb.generate()];
   let needsSamples = false;       // becomes true if any voice uses Salamander
@@ -677,7 +764,7 @@ function buildInstruments(genre, instrumentId) {
   } else if (genre === "bossa_nova") {
     melody = makeNylon(-8).connect(reverb);
   } else {
-    // ambient / neo_classical / folk / lo_fi : piano-led
+    // ambient / neo_classical / folk / lo_fi : piano-led by default
     const release = PIANO_RELEASE[genre] ?? 2.0;
     const isLoFi  = genre === "lo_fi";
     melody = makePiano(release, isLoFi ? -8 : -4);
@@ -692,53 +779,45 @@ function buildInstruments(genre, instrumentId) {
     needsSamples = true;
   }
 
-  // ── harmony per genre.
-  if (genre === "jazz_ballad") {
-    harmony = makeRhodes(-18).connect(reverb);
-  } else if (genre === "bossa_nova") {
-    harmony = makeNylon(-14).connect(reverb);
-  } else if (genre === "neo_classical") {
-    harmony = makeStringPad(-18).connect(reverb);
-  } else {
-    harmony = makeAMPad(-22).connect(reverb);
-  }
+  // ── harmony / bass: pick deterministically from the per-genre
+  //    palette using a hash of the song identity. Same date+seed =
+  //    same voice forever, but neighbouring days get different
+  //    voices so the channel doesn't feel one-note.
+  const palKey = _paletteKey(song);
+  const hPal = HARMONY_PALETTE[genre] || ["am_pad"];
+  const bPal = BASS_PALETTE[genre]    || ["piano_low"];
+  const hKind = hPal[_djb2("h|" + palKey) % hPal.length];
+  const bKind = bPal[_djb2("b|" + palKey) % bPal.length];
 
-  // ── bass per genre.
-  if (genre === "jazz_ballad") {
-    bass = toMaster(makeUprightBass(-12));
-  } else if (genre === "bossa_nova") {
-    bass = toMaster(makeUprightBass(-10));
-  } else {
-    const release = PIANO_RELEASE[genre] ?? 2.0;
-    bass = toMaster(makePiano(release * 0.7, -10));
-    needsSamples = true;
-  }
+  harmony = _buildHarmonyVoice(hKind, reverb);
+  bass    = _buildBassVoice(bKind);
+  if (bKind === "piano_low") needsSamples = true;
 
   if (needsSamples) ready.push(Tone.loaded());
 
   const percussion = makePercussion();
-  // The drone is built lazily — only attached if the song's IR actually
-  // has drone events. Voice itself is always available so swapping
-  // between cloudy / clear songs without recreating the cache works.
   const drone = makeDrone(-22);
   drone.output.connect(reverb);
 
   return {
     melody, harmony, bass, percussion, drone, reverb,
+    harmonyKind: hKind,
+    bassKind:    bKind,
     ready: Promise.all(ready),
   };
 }
 
-async function getInstruments(genre, instrumentId, reverbWet = null) {
-  const key = `${genre}::${instrumentId || ""}`;
+async function getInstruments(genre, instrumentId, reverbWet, song) {
+  // Per-song key so each unique date+seed gets its own harmony /
+  // bass voice combination. Limits the cache size implicitly to
+  // however many songs the user clicks through in one session.
+  const key = `${genre}::${instrumentId || ""}::${_paletteKey(song)}`;
   let cached = _instruments.get(key);
   if (!cached) {
-    cached = buildInstruments(genre, instrumentId || null);
+    cached = buildInstruments(genre, instrumentId || null, song);
     _instruments.set(key, cached);
   }
   await cached.ready;
-  // Per-song reverb adjustment (humidity-driven). Smooth ramp so it
-  // doesn't click when swapping variants.
   if (cached.reverb && reverbWet != null) {
     cached.reverb.wet.rampTo(reverbWet, 0.5);
   }
@@ -858,17 +937,19 @@ const INTENT_LABELS = {
 };
 
 const INSTRUMENT_LABELS = {
-  piano:     "피아노",
-  rhodes:    "EP",
-  nylon:     "기타",
-  violin:    "바이올린",
-  viola:     "비올라",
-  cello:     "첼로",
-  strings:   "현악",
-  flute:     "플루트",
-  marimba:   "마림바",
-  music_box: "음악상자",
-  horn:      "호른",
+  piano:       "피아노",
+  rhodes:      "EP",
+  nylon:       "기타",
+  violin:      "바이올린",
+  viola:       "비올라",
+  cello:       "첼로",
+  strings:     "현악",
+  flute:       "플루트",
+  tin_whistle: "휘슬",
+  harp:        "하프",
+  marimba:     "마림바",
+  music_box:   "음악상자",
+  horn:        "호른",
 };
 
 function variantLabel(song) {
@@ -1016,7 +1097,7 @@ export class DetailPanel {
     const instrumentId = this.song?.instrument_id || null;
     const reverbWet = reverbWetFromHumidity(this.song?.weather?.humidity);
     const { melody, harmony, bass, percussion, drone } =
-      await getInstruments(genre, instrumentId, reverbWet);
+      await getInstruments(genre, instrumentId, reverbWet, this.song);
 
     // Ambience layers — derived purely from weather + features so they
     // stay reproducible. Started here so they begin on the same gesture
