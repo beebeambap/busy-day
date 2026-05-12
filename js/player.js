@@ -195,6 +195,34 @@ function makeHorn(volume) {
   });
 }
 
+function makeFlute(volume) {
+  // Breathy woodwind: triangle harmonics + slow attack + steady body.
+  // Built on Tone.Synth (reliable) with a triangle8 oscillator so the
+  // tone has a hollow, fluty character without samples.
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "triangle8" },
+    envelope: { attack: 0.12, decay: 0.25, sustain: 0.80, release: 0.5 },
+  });
+  synth.volume.value = volume;
+  return synth;
+}
+
+function makeMarimba(volume) {
+  // Wooden mallet: short FM bell tone with 4:1 ratio (perfect 11th
+  // — wood-like inharmonicity) and a percussive 0-sustain envelope.
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: {
+      type:            "fmsine",
+      modulationType:  "sine",
+      harmonicity:     4,
+      modulationIndex: 8,
+    },
+    envelope: { attack: 0.001, decay: 0.8, sustain: 0.0, release: 0.6 },
+  });
+  synth.volume.value = volume;
+  return synth;
+}
+
 // instrument_id (user override) -> factory(reverbBus) returning the
 // melody synth already routed to the bus. Returning null = no override,
 // fall back to the genre-derived melody.
@@ -209,6 +237,8 @@ const INSTRUMENT_FACTORIES = {
   viola:     (reverb) => { const s = makeViola(-9);      s.connect(reverb); return s; },
   cello:     (reverb) => { const s = makeCello(-8);      s.connect(reverb); return s; },
   strings:   (reverb) => { const s = makeStrings(-10);   s.connect(reverb); return s; },
+  flute:     (reverb) => { const s = makeFlute(-8);      s.connect(reverb); return s; },
+  marimba:   (reverb) => { const s = makeMarimba(-6);    s.connect(reverb); return s; },
   music_box: (reverb) => { const s = makeMusicBox(-4);   s.connect(reverb); return s; },
   horn:      (reverb) => { const s = makeHorn(-10);      s.connect(reverb); return s; },
 };
@@ -796,7 +826,12 @@ const INSTRUMENT_LABELS = {
   piano:     "피아노",
   rhodes:    "EP",
   nylon:     "기타",
+  violin:    "바이올린",
+  viola:     "비올라",
+  cello:     "첼로",
   strings:   "현악",
+  flute:     "플루트",
+  marimba:   "마림바",
   music_box: "음악상자",
   horn:      "호른",
 };

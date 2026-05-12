@@ -21,7 +21,7 @@ const INTENT_IDS = new Set([
 ]);
 const INSTRUMENT_IDS = new Set([
   "piano", "rhodes", "nylon", "violin", "viola", "cello",
-  "strings", "music_box", "horn",
+  "strings", "flute", "marimba", "music_box", "horn",
 ]);
 const GENRE_IDS = new Set([
   "ambient", "bossa_nova", "jazz_ballad", "lo_fi",
