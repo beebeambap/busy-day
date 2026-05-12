@@ -95,6 +95,45 @@ def apply_micro_timing(
     return events
 
 
+def apply_grace_notes(
+    events: list[dict],
+    rng: Random,
+    *,
+    prob: float = 0.15,
+    min_dur_beats: float = 0.4,
+) -> list[dict]:
+    """Insert a 1/16-beat grace note one scale step away just before
+    a held melody note. Adds the lilting Celtic/Muji ornamentation
+    that mechanical motif variation can't produce.
+
+    Returns a new event list (don't mutate input order in place).
+    Events are kept sorted by (bar, start_beat).
+    """
+    if not events:
+        return events
+    GRACE = 0.0625      # 1/16 note relative to beat
+    out: list[dict] = []
+    for ev in events:
+        # need a `pitch` field and enough room to carve off a 1/16
+        dur = float(ev.get("dur_beats", 0))
+        if "pitch" in ev and dur >= min_dur_beats and rng.random() < prob:
+            offset = ev["start_beat"] - GRACE
+            if offset >= 0.0:
+                grace_pitch = ev["pitch"] + (1 if rng.random() < 0.5 else -1)
+                # diatonic-safe-ish: cap so we don't wander too far. We
+                # don't have direct mode access here, so a chromatic
+                # neighbour ±1 is fine for an instant grace note.
+                out.append({
+                    "bar":        ev["bar"],
+                    "start_beat": round(offset, 4),
+                    "pitch":      int(grace_pitch),
+                    "dur_beats":  GRACE,
+                    "vel":        max(20, int(ev.get("vel", 60) * 0.55)),
+                })
+        out.append(ev)
+    return out
+
+
 def pedal_segments(
     *,
     genre: str,
