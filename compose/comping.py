@@ -234,22 +234,22 @@ _B44 = {
          (1.0, 1.0, "fifth"),
          (2.0, 1.0, "root"),
          (3.0, 1.0, "fifth")],
-        # alt: root-fifth-root-third (more melodic)
+        # alt: walking 1-5-3-↑5 (third + upper fifth = scale movement)
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "fifth"),
-         (2.0, 1.0, "root"),
-         (3.0, 1.0, "third")],
+         (2.0, 1.0, "third"),
+         (3.0, 1.0, "fifth_up")],
     ],
     "bossa_nova": [
         [(0.0, 1.5, "root"),
          (1.5, 0.5, "fifth"),
          (2.0, 1.5, "fifth"),
          (3.5, 0.5, "root")],
-        # alt: even quarters
-        [(0.0, 1.0, "root"),
-         (1.0, 1.0, "fifth"),
-         (2.0, 1.0, "root"),
-         (3.0, 1.0, "fifth")],
+        # alt: 1-3-5-↑5 with anticipation
+        [(0.0, 1.5, "root"),
+         (1.5, 0.5, "third"),
+         (2.0, 1.5, "fifth"),
+         (3.5, 0.5, "fifth_up")],
     ],
     "jazz_ballad": [
         [(0.0, 1.0, "root"),
@@ -265,10 +265,11 @@ _B44 = {
     "lo_fi": [
         [(0.0, 2.0, "root"),
          (2.0, 2.0, "fifth")],
+        # alt: 1-3-5-3 walking
         [(0.0, 1.0, "root"),
-         (1.0, 1.0, "fifth"),
-         (2.0, 1.0, "root"),
-         (3.0, 1.0, "fifth")],
+         (1.0, 1.0, "third"),
+         (2.0, 1.0, "fifth"),
+         (3.0, 1.0, "third")],
     ],
 }
 
