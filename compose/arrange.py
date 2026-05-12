@@ -26,7 +26,7 @@ from .comping import (
     bass_pitch as _bass_pitch,
     chord_subset,
     harmony_pattern_for,
-    percussion_pattern,
+    percussion_pattern_for,
 )
 from .features import Features
 from .harmony import progression, voicing_for_genre
@@ -248,8 +248,17 @@ def compose_ir(
         # ── harmony comping (rhythmic left hand). Final bar is forced
         #    to tonic + sustained ring-out so the piece breathes shut.
         chord_for_harmony = 1 if is_final else chord_root
+        # B-section colour: 30% chance of promoting a triad bar to a
+        # seventh voicing for an extra harmonic shade. Jazz/bossa
+        # already use seventh by default so this only paints the
+        # piano-led genres. Leave the final bar at the genre default
+        # so the closing chord rings cleanly.
+        bar_voicing = voicing
+        if not is_final and section == "B" and voicing == "triad":
+            if rng.random() < 0.30:
+                bar_voicing = "seventh"
         full_chord = chord_pitches(key, mode, chord_for_harmony,
-                                   voicing=voicing, base_octave=3,
+                                   voicing=bar_voicing, base_octave=3,
                                    spread=voicing_spread)
         if is_final:
             ring_out_beats = bpb * 1.0
@@ -315,7 +324,9 @@ def compose_ir(
         #    time even when chord changes are slow. Stays silent in
         #    INTRO[0], OUTRO, and entirely for ambient.
         if not is_final and not (section == "INTRO" and bar_idx == 0):
-            for off, kind, vel_mult in percussion_pattern(genre, meter):
+            for off, kind, vel_mult in percussion_pattern_for(
+                genre, meter, section, rng,
+            ):
                 # fade percussion in over the INTRO and out over the OUTRO
                 fade = 1.0
                 if section == "INTRO":

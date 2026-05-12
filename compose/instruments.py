@@ -32,6 +32,8 @@ INSTRUMENTS: dict[str, Instrument] = {
     "viola":     Instrument("viola",     "비올라",         41, "🎻"),
     "cello":     Instrument("cello",     "첼로",           42, "🎻"),
     "strings":   Instrument("strings",   "현악기",         48, "🎻"),  # legacy alias
+    "flute":     Instrument("flute",     "플루트",         73, "🎵"),
+    "marimba":   Instrument("marimba",   "마림바",         12, "🥁"),
     "music_box": Instrument("music_box", "음악 상자",      10, "🔔"),
     "horn":      Instrument("horn",      "호른",           60, "📯"),
 }

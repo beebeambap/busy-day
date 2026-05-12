@@ -16,7 +16,7 @@ from .features import Features
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 KEYS = ["C", "D", "E", "F", "G", "A", "B"]
-MODES = ["ionian", "dorian", "lydian", "mixolydian"]
+MODES = ["ionian", "dorian", "lydian", "mixolydian", "aeolian"]
 GENRES = ["ambient", "bossa_nova", "jazz_ballad", "lo_fi", "neo_classical", "folk"]
 METERS = ["3/4", "4/4", "6/8"]
 
@@ -33,12 +33,14 @@ def _weighted_choice(rng: Random, items: list, weights: list[float]) -> Any:
 
 
 def pick_mode(rng: Random, f: Features) -> str:
-    # bright -> ionian/lydian; dim -> dorian; warm dry -> mixolydian
+    # bright → ionian/lydian; dim → dorian; warm dry → mixolydian;
+    # rainy + dim + calm → aeolian (true natural minor).
     weights = [
-        0.30 + 0.40 * f.brightness,                   # ionian
-        0.25 + 0.35 * (1.0 - f.brightness),           # dorian
-        0.10 + 0.30 * (f.brightness * f.calmness),    # lydian
-        0.15 + 0.30 * (f.warmth * (1.0 - f.wetness)), # mixolydian
+        0.30 + 0.40 * f.brightness,                                  # ionian
+        0.25 + 0.30 * (1.0 - f.brightness),                          # dorian
+        0.10 + 0.30 * (f.brightness * f.calmness),                   # lydian
+        0.15 + 0.30 * (f.warmth * (1.0 - f.wetness)),                # mixolydian
+        0.10 + 0.45 * (f.wetness * (1.0 - f.brightness)),            # aeolian
     ]
     return _weighted_choice(rng, MODES, weights)
 
@@ -133,12 +135,15 @@ def pick_motif(
     def score(m: dict) -> float:
         tags = set(m.get("tags", []))
         s = 1.0
-        if "warm" in tags:    s += 0.6 * f.warmth
-        if "bright" in tags:  s += 0.6 * f.brightness
-        if "wet" in tags:     s += 0.6 * f.wetness
-        if "sparse" in tags:  s += 0.4 * f.calmness
-        if "soft" in tags:    s += 0.3 * f.calmness
-        if "minor_lean" in tags: s += 0.4 * (1.0 - f.brightness)
+        if "warm" in tags:           s += 0.6 * f.warmth
+        if "bright" in tags:         s += 0.6 * f.brightness
+        if "wet" in tags:            s += 0.6 * f.wetness
+        if "sparse" in tags:         s += 0.4 * f.calmness
+        if "soft" in tags:           s += 0.3 * f.calmness
+        if "minor_lean" in tags:     s += 0.5 * (1.0 - f.brightness)
+        if "wide_leap" in tags:      s += 0.4 * f.brightness
+        if "ostinato" in tags:       s += 0.3 * f.calmness
+        if "question_answer" in tags:s += 0.3 * (1.0 - f.calmness)
         if m["id"] in avoid_ids:
             s *= 0.05
         return max(s, 0.01)
