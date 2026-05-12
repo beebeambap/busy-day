@@ -282,7 +282,7 @@ const INSTRUMENT_FACTORIES = {
   harp:        (reverb) => { const s = makeHarp(-6);        s.connect(reverb); return s; },
   marimba:     (reverb) => { const s = makeMarimba(-6);     s.connect(reverb); return s; },
   music_box:   (reverb) => { const s = makeMusicBox(-4);    s.connect(reverb); return s; },
-  horn:      (reverb) => { const s = makeHorn(-10);      s.connect(reverb); return s; },
+  horn:      (reverb) => { const s = makeHorn(-14);      s.connect(reverb); return s; },
 };
 
 function makeUprightBass(volume) {
@@ -1123,10 +1123,22 @@ export class DetailPanel {
       else if (name.includes("drone")) inst = drone;
       else                             inst = melody;
 
+      const isMelody = inst === melody;
+      // Cello and horn melodies are generated at base_octave=5 (same as
+      // all other instruments). But the characteristic cello sound lives
+      // an octave lower (C3-C5 lyrical range, not C5-B5 thumb position),
+      // so we transpose melody notes down one octave at playback time.
+      // Horn similarly sits naturally in a lower register (F2-F5 range).
+      const melodyOctaveShift =
+        isMelody && (instrumentId === "cello" || instrumentId === "horn") ? -1 : 0;
+
       track.notes.forEach((note) => {
+        const noteName = melodyOctaveShift
+          ? Tone.Frequency(note.name).transpose(melodyOctaveShift * 12).toNote()
+          : note.name;
         Tone.Transport.schedule((time) => {
           inst.triggerAttackRelease(
-            note.name, note.duration, time, note.velocity * 0.85,
+            noteName, note.duration, time, note.velocity * 0.85,
           );
         }, t0 + note.time);
       });
