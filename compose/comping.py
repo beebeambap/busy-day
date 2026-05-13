@@ -75,17 +75,31 @@ _H44 = {
          (3.5, 0.5, "top",    0.82)],
     ],
     "bossa_nova": [
-        # canonical: bossa rhythm
+        # canonical: classic bossa básica — root on 1, anticipated chord
+        # on the "and of 1", fifth on 3, two-note tail
         [(0.0,  0.5, "root",   0.95),
          (0.75, 1.0, "top",    0.92),
          (2.0,  0.5, "fifth",  0.85),
          (2.5,  0.5, "top",    0.92),
          (3.0,  1.0, "top",    0.90)],
-        # alt: anticipated comp
+        # alt 1: same shape, second-half pushed back ("late comp")
         [(0.0,  0.75, "root",  0.95),
          (0.75, 1.25, "top",   0.92),
          (2.5,  0.5, "fifth",  0.88),
          (3.0,  0.5, "top",    0.90),
+         (3.5,  0.5, "top",    0.85)],
+        # alt 2: partido-alto "esparso" — only 2 hits, heavy syncopation,
+        # creates breathing room. Very different rhythmic shape from the
+        # other cells — listener immediately hears the change.
+        [(0.0,  1.5, "all",    0.95),
+         (2.5,  1.5, "top",    0.88)],
+        # alt 3: "samba dense" — chord chops on the and-of beats, root
+        # accent on 3. Forward-driving, no downbeat chord on 1 (the
+        # bass holds beat 1 alone, an "African" Brazilian feel).
+        [(0.5,  0.5, "top",    0.85),
+         (1.5,  0.5, "top",    0.82),
+         (2.0,  0.5, "root",   0.92),
+         (2.5,  0.5, "top",    0.88),
          (3.5,  0.5, "top",    0.85)],
     ],
     "jazz_ballad": [
@@ -241,15 +255,28 @@ _B44 = {
          (3.0, 1.0, "fifth_up")],
     ],
     "bossa_nova": [
+        # canonical: classic bossa "1.5 + 0.5 + 1.5 + 0.5" rhythm —
+        # dotted-quarter on 1, eighth pickup on 2.5 to dotted-quarter
+        # on 3, eighth pickup on 4.5 back to root.
         [(0.0, 1.5, "root"),
          (1.5, 0.5, "fifth"),
          (2.0, 1.5, "fifth"),
          (3.5, 0.5, "root")],
-        # alt: 1-3-5-↑5 with anticipation
+        # alt 1: same rhythm, walking pitches (1-3-5-↑5)
         [(0.0, 1.5, "root"),
          (1.5, 0.5, "third"),
          (2.0, 1.5, "fifth"),
          (3.5, 0.5, "fifth_up")],
+        # alt 2: tumbao-feel — long root, syncopated fifth that
+        # anticipates beat 3, eighth pickup. The half-bar lopsided shape
+        # contrasts the symmetric canonical 1.5+0.5+1.5+0.5.
+        [(0.0, 2.5, "root"),
+         (2.5, 1.0, "fifth"),
+         (3.5, 0.5, "root")],
+        # alt 3: "2-feel" — half-note root + half-note fifth. Very sparse,
+        # ballad-bossa. Pulls the energy back so the melody stands out.
+        [(0.0, 2.0, "root"),
+         (2.0, 2.0, "fifth")],
     ],
     "jazz_ballad": [
         [(0.0, 1.0, "root"),
@@ -398,13 +425,22 @@ _ALT_BIAS = {
 
 
 def _pick_cell(cells, section, rng: Random):
-    """Pick canonical or alt cell based on section bias."""
+    """Pick canonical or alt cell based on section bias.
+
+    Supports N cells: cells[0] is canonical (the stable default), and
+    cells[1:] are alternates. When the alt branch fires, one of the
+    alternates is chosen uniformly. Backwards compatible with the
+    original 2-cell layout (alt-prob applied to cells[1])."""
     if not cells:
         return []
     if len(cells) == 1:
         return cells[0]
     p_alt = _ALT_BIAS.get(section, 0.30)
-    return cells[1] if rng.random() < p_alt else cells[0]
+    if rng.random() >= p_alt:
+        return cells[0]
+    if len(cells) == 2:
+        return cells[1]
+    return rng.choice(cells[1:])
 
 
 def _maybe_drop_last(events, rng: Random, p: float = 0.12):
