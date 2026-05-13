@@ -41,38 +41,64 @@ from random import Random
 
 _H44 = {
     "ambient": [
-        # canonical: pure pad, whole note
+        # canonical: pure pad, whole note — the genre's anchor
         [(0.0, 4.0, "all",   1.00)],
-        # alt: split mid-bar into two halves so the pad "breathes"
+        # alt 1: split mid-bar into two halves so the pad "breathes"
         [(0.0, 2.0, "all",   1.00),
          (2.0, 2.0, "top",   0.85)],
+        # alt 2: delayed swell — silence on beat 1, pad enters on the
+        # "and of 1" and holds. Eno-style suspension where the bar
+        # appears to start late. Stays minimal (1 hit only).
+        [(0.5, 3.5, "all",   0.95)],
     ],
     "neo_classical": [
-        # canonical: block + 3 stabs
+        # canonical: block + 3 stabs (Yiruma-style)
         [(0.0, 1.0, "all",   1.00),
          (1.0, 1.0, "top",   0.85),
          (2.0, 1.0, "top",   0.85),
          (3.0, 1.0, "top",   0.80)],
-        # alt: longer downbeat + arpeggio tail
+        # alt 1: longer downbeat + arpeggio tail
         [(0.0, 2.0, "all",   1.00),
          (2.0, 0.5, "top",   0.80),
          (2.5, 0.5, "fifth", 0.78),
          (3.0, 0.5, "top",   0.85),
          (3.5, 0.5, "root_5", 0.85)],
+        # alt 2: rolled arpeggio — broken chord climbing through eighths
+        # (Einaudi/Tiersen sustain-pedal feel, sounds like a single
+        # rolled chord with the pedal down).
+        [(0.0, 0.5, "root",   0.90),
+         (0.5, 0.5, "fifth",  0.85),
+         (1.0, 0.5, "top",    0.85),
+         (1.5, 2.5, "top3",   0.92)],
+        # alt 3: held suspension + answer — 3-beat sustain releases into
+        # a quiet quarter-note answer. Voice leading shows in the answer.
+        [(0.0, 3.0, "all",    1.00),
+         (3.0, 1.0, "top",    0.78)],
     ],
     "folk": [
-        # canonical: alternating root_5 / top quarters
+        # canonical: alternating root_5 / top quarters (boom-chuck)
         [(0.0, 1.0, "root_5", 0.95),
          (1.0, 1.0, "top",    0.90),
          (2.0, 1.0, "root_5", 0.90),
          (3.0, 1.0, "top",    0.88)],
-        # alt: same shell, eighth-note answer on beats 2 & 4
+        # alt 1: same shell, eighth-note answer on beats 2 & 4
         [(0.0, 1.0, "root_5", 0.95),
          (1.0, 0.5, "top",    0.88),
          (1.5, 0.5, "top",    0.82),
          (2.0, 1.0, "root_5", 0.92),
          (3.0, 0.5, "top",    0.88),
          (3.5, 0.5, "top",    0.82)],
+        # alt 2: Celtic drone — open root_5 held for 2 beats then a
+        # single chord answer on 3. Pairs perfectly with the open_fifth
+        # voicing the arranger leans into for folk (Muji-Celtic core).
+        [(0.0, 2.0, "root_5", 0.95),
+         (2.0, 2.0, "top",    0.85)],
+        # alt 3: lilting pickup — silence on beat 1, eighth pickup on
+        # the "and of 1" into a held chord. The "anacrusis" pulls the
+        # listener forward (jig feel even in 4/4).
+        [(0.5, 0.5, "root_5", 0.85),
+         (1.0, 1.5, "top",    0.92),
+         (2.5, 1.5, "root_5", 0.88)],
     ],
     "bossa_nova": [
         # canonical: classic bossa básica — root on 1, anticipated chord
@@ -93,34 +119,52 @@ _H44 = {
         # other cells — listener immediately hears the change.
         [(0.0,  1.5, "all",    0.95),
          (2.5,  1.5, "top",    0.88)],
-        # alt 3: "samba dense" — chord chops on the and-of beats, root
-        # accent on 3. Forward-driving, no downbeat chord on 1 (the
-        # bass holds beat 1 alone, an "African" Brazilian feel).
-        [(0.5,  0.5, "top",    0.85),
-         (1.5,  0.5, "top",    0.82),
-         (2.0,  0.5, "root",   0.92),
-         (2.5,  0.5, "top",    0.88),
-         (3.5,  0.5, "top",    0.85)],
+        # alt 3: "ballad bossa" — Tom Jobim style. Long sustained
+        # downbeat chord, ghost chord on the "and of 1", anticipated
+        # pickup on 4.5. Sparser and more contemplative than alt 2,
+        # asymmetric so it contrasts the "esparso" two-equal-halves shape.
+        # Replaces the previous "samba dense" cell which leaned too
+        # samba-batida and broke the bossa identity ("soft and airy").
+        [(0.0, 1.5, "all",    0.92),
+         (1.5, 0.5, "top",    0.78),
+         (3.5, 0.5, "top",    0.82)],
     ],
     "jazz_ballad": [
         # canonical: long stabs
         [(0.0, 2.0, "top3",   0.90),
          (2.0, 0.5, "top",    0.80),
          (2.5, 1.5, "top3",   0.88)],
-        # alt: 4 stabs, busier
+        # alt 1: 4 stabs, busier
         [(0.0, 1.0, "top3",   0.90),
          (1.5, 0.5, "top",    0.80),
          (2.0, 1.0, "top3",   0.85),
          (3.5, 0.5, "top",    0.82)],
+        # alt 2: rubato whole — single sustained chord across the bar.
+        # The "Bill Evans pause" — gives the melody/walking bass full
+        # spotlight. Most contrasting cell against the busy alt 1.
+        [(0.0, 4.0, "top3",   0.88)],
+        # alt 3: two-stab breath — chord on 1 and chord on 3 only,
+        # very spacious. Classic ballad piano comping where the left
+        # hand sits out the off-beats.
+        [(0.0, 2.0, "top3",   0.90),
+         (2.0, 2.0, "top3",   0.85)],
     ],
     "lo_fi": [
-        # canonical: lazy 2-hit
+        # canonical: lazy 2-hit (off-beat 1 and off-beat 3)
         [(0.5, 1.5, "top",    0.85),
          (2.5, 1.5, "top",    0.82)],
-        # alt: 3 hits with anticipation
+        # alt 1: 3 hits with anticipation
         [(0.5, 1.0, "top",    0.85),
          (1.75, 0.75, "top",  0.80),
          (2.5, 1.5, "top",    0.82)],
+        # alt 2: off-beat float — chords on the "and of 2" and
+        # "and of 4" only. Pulls the chord off the strong beats
+        # entirely, very lazy/floating.
+        [(1.5, 1.0, "top",    0.82),
+         (3.5, 0.5, "top",    0.78)],
+        # alt 3: long sustain — single chord held the entire bar.
+        # The "tape hiss" cell where the chord just hangs in the air.
+        [(0.0, 4.0, "top",    0.85)],
     ],
 }
 
@@ -140,21 +184,33 @@ _H34 = {
          (2.5, 0.5, "top",  0.85)],
     ],
     "folk": [
+        # canonical: waltz strum
         [(0.0, 1.0, "root_5", 0.95),
          (1.0, 1.0, "top",    0.88),
          (2.0, 1.0, "top",    0.85)],
+        # alt 1: eighth answer on beat 2
         [(0.0, 1.0, "root_5", 0.95),
          (1.0, 0.5, "top",    0.88),
          (1.5, 0.5, "top",    0.82),
          (2.0, 1.0, "top",    0.85)],
+        # alt 2: Celtic waltz drone — open root_5 held 2 beats then a
+        # single chord on 3. The "Loreena McKennitt" waltz feel.
+        [(0.0, 2.0, "root_5", 0.95),
+         (2.0, 1.0, "top",    0.88)],
     ],
     "bossa_nova": [
+        # canonical: bossa waltz (rare but valid — "Waltz for Debby"
+        # vibe when bossa hits 3/4)
         [(0.0, 1.0, "root",   0.95),
          (1.0, 1.0, "top",    0.90),
          (2.0, 1.0, "top",    0.88)],
+        # alt 1: anticipated answer
         [(0.0, 0.5, "root",   0.95),
          (0.75, 1.25, "top",  0.90),
          (2.0, 1.0, "top",    0.88)],
+        # alt 2: sparse — chord on 1 + anticipated pickup on 2.5
+        [(0.0, 1.5, "all",    0.92),
+         (2.5, 0.5, "top",    0.82)],
     ],
     "jazz_ballad": [
         [(0.0, 3.0, "top3", 0.90)],
@@ -186,14 +242,29 @@ _H68 = {
          (5.0, 1.0, "top",   0.85)],
     ],
     "folk": [
+        # canonical: jig pulse — 6/8 in two dotted-quarter halves
         [(0.0, 1.5, "root_5", 0.95),
          (1.5, 1.5, "top",    0.88),
          (3.0, 1.5, "root_5", 0.92),
          (4.5, 1.5, "top",    0.85)],
+        # alt 1: subdivided eighths in beat 2 (Celtic ornament feel)
         [(0.0, 1.5, "root_5", 0.95),
          (1.5, 0.75, "top",   0.88),
          (2.25, 0.75, "top",  0.80),
          (3.0, 1.5, "root_5", 0.92),
+         (4.5, 1.5, "top",    0.85)],
+        # alt 2: drone jig — open fifth held for the full first half,
+        # accent chord on beats 4 and 5.5. The "Riverdance drone"
+        # where the bagpipe-like chord sustains underneath.
+        [(0.0, 3.0, "root_5", 0.95),
+         (3.0, 1.5, "top",    0.85),
+         (4.5, 1.5, "top",    0.82)],
+        # alt 3: pickup-and-fall — eighth pickup on the "and of 6"
+        # (last eighth of the previous bar, here as bar start), held
+        # chord through beats 1-3, single chord on beat 4. Lilting.
+        [(0.0, 0.5, "root_5", 0.85),
+         (0.5, 2.5, "top",    0.92),
+         (3.0, 1.5, "root_5", 0.90),
          (4.5, 1.5, "top",    0.85)],
     ],
     "bossa_nova": [
@@ -224,11 +295,17 @@ _H68 = {
 # ── bass per (genre, beats_per_bar) ────────────────────────────────
 _B44 = {
     "ambient": [
+        # canonical: pure root drone for the whole bar
         [(0.0, 4.0, "root")],
+        # alt 1: half + half root/fifth (subtle harmonic motion)
         [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],
+        # alt 2: half-bar bass — root for 2 beats, then silence. Lets
+        # the drone (when present) or the harmony pad carry beats 3-4
+        # alone. Maximum sparseness without going entirely empty.
+        [(0.0, 2.0, "root")],
     ],
     "neo_classical": [
-        # canonical: alberti
+        # canonical: alberti — 8 eighth-note arpeggios (Mozart left hand)
         [(0.0, 0.5, "root"),
          (0.5, 0.5, "fifth_up"),
          (1.0, 0.5, "third"),
@@ -237,22 +314,43 @@ _B44 = {
          (2.5, 0.5, "fifth_up"),
          (3.0, 0.5, "third"),
          (3.5, 0.5, "fifth_up")],
-        # alt: walking quarters
+        # alt 1: walking quarters
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "third"),
          (2.0, 1.0, "fifth"),
          (3.0, 1.0, "third")],
+        # alt 2: pedal point — held root for the whole bar. The classic
+        # "organ pedal" where the bass anchors while the harmony moves
+        # above. Pairs with the held-suspension harmony cell.
+        [(0.0, 4.0, "root")],
+        # alt 3: octave-leap — root low, then root mid-high in the
+        # second half (figured-bass tradition; gives a sense of
+        # vertical lift mid-bar without changing chord function).
+        [(0.0, 2.0, "root"),
+         (2.0, 2.0, "fifth_up")],
     ],
     "folk": [
+        # canonical: boom-chick (root on 1+3, fifth on 2+4)
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "fifth"),
          (2.0, 1.0, "root"),
          (3.0, 1.0, "fifth")],
-        # alt: walking 1-5-3-↑5 (third + upper fifth = scale movement)
+        # alt 1: walking 1-5-3-↑5 (third + upper fifth = scale movement)
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "fifth"),
          (2.0, 1.0, "third"),
          (3.0, 1.0, "fifth_up")],
+        # alt 2: Celtic drone root — root held all 4 beats. Pairs with
+        # the open_fifth harmony voicing for the "ancient modal" sound.
+        # The bass drones, the harmony breathes. Pure Muji-Celtic core.
+        [(0.0, 4.0, "root")],
+        # alt 3: stepwise scale walk — 1-2-3-5 (passing tone on beat 2).
+        # Half-step movement gives a more "ballad-folk" feel than the
+        # canonical boom-chick. Sounds like a Nick Drake bass line.
+        [(0.0, 1.0, "root"),
+         (1.0, 1.0, "third"),
+         (2.0, 1.0, "fifth"),
+         (3.0, 1.0, "root")],
     ],
     "bossa_nova": [
         # canonical: classic bossa "1.5 + 0.5 + 1.5 + 0.5" rhythm —
@@ -279,24 +377,46 @@ _B44 = {
          (2.0, 2.0, "fifth")],
     ],
     "jazz_ballad": [
+        # canonical: walking quarters 1-3-5-3
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "third"),
          (2.0, 1.0, "fifth"),
          (3.0, 1.0, "third")],
-        # alt: chromatic-feeling fifth_up between
+        # alt 1: chromatic-feeling fifth_up between
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "fifth_up"),
          (2.0, 1.0, "fifth"),
          (3.0, 1.0, "third")],
-    ],
-    "lo_fi": [
+        # alt 2: pedal-then-walk — root for 2 beats, walk in beats 3-4.
+        # Gives the bar a "two-feel" first half and "four-feel" second
+        # half; classic Bill Evans trio bass move.
+        [(0.0, 2.0, "root"),
+         (2.0, 1.0, "fifth"),
+         (3.0, 1.0, "third")],
+        # alt 3: half-note bass — root + fifth, two hits only. Pairs
+        # with the "ballad rubato" whole-note harmony cell to create a
+        # truly spacious bar.
         [(0.0, 2.0, "root"),
          (2.0, 2.0, "fifth")],
-        # alt: 1-3-5-3 walking
+    ],
+    "lo_fi": [
+        # canonical: half + half root/fifth
+        [(0.0, 2.0, "root"),
+         (2.0, 2.0, "fifth")],
+        # alt 1: 1-3-5-3 walking quarters
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "third"),
          (2.0, 1.0, "fifth"),
          (3.0, 1.0, "third")],
+        # alt 2: 808-style sustain — long root with a brief fifth
+        # ghost on 3.5 (anticipates beat 4). The fifth is short like
+        # a sub-bass tail. Boom-bap sub-bass aesthetic.
+        [(0.0, 3.5, "root"),
+         (3.5, 0.5, "fifth")],
+        # alt 3: anticipated drop — root on 1, fifth pushed to 3.5
+        # (pulls the bar forward). Lazy and slightly off-grid.
+        [(0.0, 3.5, "root"),
+         (3.5, 0.5, "fifth_up")],
     ],
 }
 
@@ -317,12 +437,16 @@ _B34 = {
          (2.0, 1.0, "fifth")],
     ],
     "folk": [
+        # canonical: waltz boom-chick-chick (root + 2 fifths)
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "fifth"),
          (2.0, 1.0, "fifth")],
+        # alt 1: walking 1-3-5
         [(0.0, 1.0, "root"),
          (1.0, 1.0, "third"),
          (2.0, 1.0, "fifth")],
+        # alt 2: Celtic drone — root held for the full bar
+        [(0.0, 3.0, "root")],
     ],
     "bossa_nova": [
         [(0.0, 1.0, "root"),
@@ -368,14 +492,22 @@ _B68 = {
          (4.5, 1.5, "third")],
     ],
     "folk": [
+        # canonical: jig boom-chick (root + fifth alternating dotted-quarters)
         [(0.0, 1.5, "root"),
          (1.5, 1.5, "fifth"),
          (3.0, 1.5, "root"),
          (4.5, 1.5, "fifth")],
+        # alt 1: substitute third on the last quarter (motion)
         [(0.0, 1.5, "root"),
          (1.5, 1.5, "fifth"),
          (3.0, 1.5, "root"),
          (4.5, 1.5, "third")],
+        # alt 2: drone root — held for the full bar (Celtic bagpipe drone)
+        [(0.0, 6.0, "root")],
+        # alt 3: rocking root-fifth — root for the first half-bar,
+        # fifth for the second. Slower harmonic rhythm than canonical.
+        [(0.0, 3.0, "root"),
+         (3.0, 3.0, "fifth")],
     ],
     "bossa_nova": [
         [(0.0, 1.5, "root"),
