@@ -1,8 +1,9 @@
 import { bindGate } from "./auth.js";
 import { CalendarView } from "./calendar.js";
 import { DetailPanel } from "./player.js";
-import { findVariant, fetchVariants, triggerCompose } from "./api.js";
+import { findVariant, fetchVariants, triggerCompose, triggerTape } from "./api.js";
 import { DEFAULT_CITY, DEFAULT_CITY_NAME } from "./config.js";
+import { TAPE_LABELS } from "./tapes.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -199,7 +200,41 @@ function makeProgressPopup() {
 function boot() {
   $("city-name").textContent = DEFAULT_CITY_NAME;
 
-  const detail = new DetailPanel({ root: $("detail") });
+  const progress = makeProgressPopup();
+
+  // Tape trigger: lives here (not in DetailPanel) so it can share the
+  // progress popup with the intent flow and refresh the calendar.
+  // DetailPanel just calls back when the user clicks "편곡하기".
+  async function runTapeTrigger({ sourceId, sourceDate, tapeId }) {
+    const eta = 45;
+    const dateIso = sourceDate || todayKST();
+    progress.show(eta);
+    try {
+      const r = await triggerTape({
+        source_song_id: sourceId,
+        tape_id:        tapeId,
+      });
+      const realEta = r.eta_sec || eta;
+      progress.tick(0, realEta);
+      const row = await pollForVariant(
+        DEFAULT_CITY, dateIso, r.variant_id, realEta,
+        (elapsed) => progress.tick(elapsed, realEta),
+      );
+      progress.hide();
+      await cal.render();
+      const variants = await fetchVariants(DEFAULT_CITY, dateIso);
+      detail.open(row, variants);
+    } catch (err) {
+      console.error(err);
+      const presetLabel = TAPE_LABELS[tapeId]?.label || tapeId;
+      progress.fail(`${presetLabel} 편곡 실패: ${err.message || err}`);
+    }
+  }
+
+  const detail = new DetailPanel({
+    root:          $("detail"),
+    onTapeTrigger: runTapeTrigger,
+  });
 
   const cal = new CalendarView({
     gridEl:  $("grid"),
@@ -214,8 +249,6 @@ function boot() {
   filterEl.addEventListener("change", () => {
     cal.setFilter(filterEl.value || null);
   });
-
-  const progress = makeProgressPopup();
 
   const intentModal = makeIntentModal({
     onSubmit: async ({ intent_id, genre_id, instrument_id }) => {

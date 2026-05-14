@@ -244,6 +244,37 @@ main {
 }
 .detail-head p { margin: 0 0 1rem; font-size: 13px; }
 
+/* "편곡하기" action card — sits between variant chips and score
+   when the day's weather matches a tape preset (see js/tapes.js). */
+.tape-action {
+  margin: 0.5rem 0 0.75rem;
+}
+.tape-btn {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.7rem 0.95rem;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.tape-btn:hover:not(:disabled) { background: rgba(20, 18, 14, 0.04); }
+.tape-btn:disabled { opacity: 0.45; cursor: progress; }
+.tape-btn .tape-icon { font-size: 18px; line-height: 1; }
+.tape-btn .tape-label {
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+.tape-btn .tape-sub {
+  font-size: 12px;
+  text-align: right;
+}
+
 .score {
   margin: 1rem 0 1.25rem;
   background: #fff;

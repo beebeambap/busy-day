@@ -21,7 +21,7 @@ const SONG_COLS =
   "id, city_id, date, variant_id, intent_id, instrument_id, " +
   "key_root, mode, genre, bpm, meter, duration_short_sec, " +
   "duration_long_sec, weather, paths, title, notes, " +
-  "notes_updated_at, created_at";
+  "notes_updated_at, created_at, tape_id, source_song_id";
 
 // Order so 'auto' shows first, then user variants by created_at desc.
 function _sortVariants(rows) {
@@ -99,6 +99,30 @@ export async function triggerCompose(
   try { body = JSON.parse(text); } catch { body = { error: text }; }
   if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
   return body;          // { variant_id, intent_id, instrument_id, eta_sec, ... }
+}
+
+// Dispatch a tape arrangement: returns { variant_id, eta_sec }.
+// The Edge Function fires-and-forgets a GitHub Actions workflow that
+// reads the source song's IR from Storage, transforms it per the
+// preset, renders the new MIDI + SVG, and inserts a new songs row.
+// The caller should poll `findVariant(city, date, variant_id)` until
+// the row appears.
+export async function triggerTape({ source_song_id, tape_id }) {
+  const url = `${SUPABASE_URL}/functions/v1/trigger_tape`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "apikey":         SUPABASE_PUBLISHABLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ source_song_id, tape_id }),
+  });
+  const text = await r.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { error: text }; }
+  if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+  return body;          // { variant_id, eta_sec }
 }
 
 export async function recordPlay(songId, variant) {

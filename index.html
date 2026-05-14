@@ -107,6 +107,16 @@
         <div id="detail-variants" class="variant-chips" hidden></div>
       </header>
 
+      <!-- weather-tape action card. Shown only on non-tape variants
+           whose weather matches a known tape preset (see js/tapes.js). -->
+      <div id="detail-tape-action" class="tape-action" hidden>
+        <button id="tape-btn" type="button" class="tape-btn">
+          <span class="tape-icon" aria-hidden="true">🌞</span>
+          <span class="tape-label">편곡하기</span>
+          <span class="tape-sub muted small">맑고 더운 날 톤</span>
+        </button>
+      </div>
+
       <figure class="score">
         <div id="detail-score" class="score-svg" hidden></div>
         <p id="detail-score-empty" class="empty muted">악보 준비 중</p>
