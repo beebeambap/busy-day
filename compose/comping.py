@@ -303,6 +303,14 @@ _B44 = {
         # the drone (when present) or the harmony pad carry beats 3-4
         # alone. Maximum sparseness without going entirely empty.
         [(0.0, 2.0, "root")],
+        # alt 3: gentle quarter pulse with chord-tone arch. Adds a
+        # baseline pulse so ambient at faster tempos doesn't feel
+        # draggy. Root anchors beats 1+3, third and fifth fill 2+4
+        # for smooth motion (still ambient-quiet via velocity curve).
+        [(0.0, 1.0, "root"),
+         (1.0, 1.0, "third"),
+         (2.0, 1.0, "fifth"),
+         (3.0, 1.0, "third")],
     ],
     "neo_classical": [
         # canonical: alberti — 8 eighth-note arpeggios (Mozart left hand)
@@ -328,6 +336,18 @@ _B44 = {
         # vertical lift mid-bar without changing chord function).
         [(0.0, 2.0, "root"),
          (2.0, 2.0, "fifth_up")],
+        # alt 4: scalar walking — eighth-note bass through octave-
+        # displaced chord tones for melodic shape (Schubert-lieder
+        # bass tradition). Different from alberti: alberti hammers
+        # the low chord-tone + fifth_up alternation; this one walks.
+        [(0.0, 0.5, "fifth_up"),
+         (0.5, 0.5, "third"),
+         (1.0, 0.5, "root"),
+         (1.5, 0.5, "fifth"),
+         (2.0, 0.5, "third"),
+         (2.5, 0.5, "fifth_up"),
+         (3.0, 0.5, "fifth"),
+         (3.5, 0.5, "root")],
     ],
     "folk": [
         # canonical: boom-chick (root on 1+3, fifth on 2+4)
@@ -351,6 +371,18 @@ _B44 = {
          (1.0, 1.0, "third"),
          (2.0, 1.0, "fifth"),
          (3.0, 1.0, "root")],
+        # alt 4: galloping 8th-note pulse. Root anchors every strong
+        # beat; off-beats walk through chord tones for melodic shape.
+        # Doubles the bass density of canonical so faster tempos
+        # actually feel propulsive. Tom Petty / Americana feel.
+        [(0.0, 0.5, "root"),
+         (0.5, 0.5, "fifth"),
+         (1.0, 0.5, "root"),
+         (1.5, 0.5, "third"),
+         (2.0, 0.5, "root"),
+         (2.5, 0.5, "fifth"),
+         (3.0, 0.5, "fifth"),
+         (3.5, 0.5, "fifth_up")],
     ],
     "bossa_nova": [
         # canonical: classic bossa "1.5 + 0.5 + 1.5 + 0.5" rhythm —
@@ -375,6 +407,14 @@ _B44 = {
         # ballad-bossa. Pulls the energy back so the melody stands out.
         [(0.0, 2.0, "root"),
          (2.0, 2.0, "fifth")],
+        # alt 4: chord-tone walking quarters. Same hit count as canonical
+        # but breaks the symmetric 1.5+0.5+1.5+0.5 rhythm and moves
+        # melodically through root/third/fifth. Bossa-jazz hybrid; the
+        # Jobim recordings where the bass takes a melodic role.
+        [(0.0, 1.0, "root"),
+         (1.0, 1.0, "third"),
+         (2.0, 1.0, "fifth"),
+         (3.0, 1.0, "third")],
     ],
     "jazz_ballad": [
         # canonical: walking quarters 1-3-5-3
@@ -398,6 +438,17 @@ _B44 = {
         # truly spacious bar.
         [(0.0, 2.0, "root"),
          (2.0, 2.0, "fifth")],
+        # alt 4: bebop straight-eighth walking. 8 hits per bar through
+        # all chord tones with octave displacement. The "Paul Chambers"
+        # / "Ray Brown" walking bass at double density.
+        [(0.0, 0.5, "root"),
+         (0.5, 0.5, "third"),
+         (1.0, 0.5, "fifth"),
+         (1.5, 0.5, "fifth_up"),
+         (2.0, 0.5, "fifth"),
+         (2.5, 0.5, "third"),
+         (3.0, 0.5, "fifth"),
+         (3.5, 0.5, "fifth_up")],
     ],
     "lo_fi": [
         # canonical: half + half root/fifth
@@ -417,6 +468,15 @@ _B44 = {
         # (pulls the bar forward). Lazy and slightly off-grid.
         [(0.0, 3.5, "root"),
          (3.5, 0.5, "fifth_up")],
+        # alt 4: active boom-bap — 6 hits with root anchors on strong
+        # beats and syncopated fifth on the ands. Adds pulse so lo_fi
+        # at slower tempos doesn't feel draggy. J Dilla micro-syncopation.
+        [(0.0, 0.5, "root"),
+         (1.5, 0.5, "fifth"),
+         (2.0, 0.5, "root"),
+         (2.5, 0.5, "fifth_up"),
+         (3.0, 0.5, "root"),
+         (3.5, 0.5, "fifth")],
     ],
 }
 
@@ -447,6 +507,14 @@ _B34 = {
          (2.0, 1.0, "fifth")],
         # alt 2: Celtic drone — root held for the full bar
         [(0.0, 3.0, "root")],
+        # alt 3: 8th-note waltz pulse — 6 hits with chord-tone motion.
+        # Drives slow 3/4 tempos so the waltz doesn't drag.
+        [(0.0, 0.5, "root"),
+         (0.5, 0.5, "fifth"),
+         (1.0, 0.5, "third"),
+         (1.5, 0.5, "fifth"),
+         (2.0, 0.5, "fifth"),
+         (2.5, 0.5, "third")],
     ],
     "bossa_nova": [
         [(0.0, 1.0, "root"),
@@ -508,6 +576,17 @@ _B68 = {
         # fifth for the second. Slower harmonic rhythm than canonical.
         [(0.0, 3.0, "root"),
          (3.0, 3.0, "fifth")],
+        # alt 4: tight jig gallop — root anchors on the two main beats
+        # (1 and 4) with eighth-note chord-tone fills between. The
+        # propulsive Celtic dance bass that drives even slow jigs.
+        [(0.0, 1.5, "root"),
+         (1.5, 0.5, "fifth"),
+         (2.0, 0.5, "third"),
+         (2.5, 0.5, "fifth"),
+         (3.0, 1.5, "root"),
+         (4.5, 0.5, "fifth"),
+         (5.0, 0.5, "third"),
+         (5.5, 0.5, "fifth")],
     ],
     "bossa_nova": [
         [(0.0, 1.5, "root"),
