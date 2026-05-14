@@ -536,9 +536,29 @@ main {
 /* ── variant chips inside detail head ────────────────────── */
 .variant-chips {
   display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0.25rem;
+}
+/* Each group ("원곡" or "편곡") has a tiny label on the left and a
+   flex row of chip buttons. On mobile the label sits above the row. */
+.variant-group {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.variant-group-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #8a8071);
+  padding-top: 0.3rem;
+}
+.variant-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin: 0.75rem 0 0.25rem;
 }
 .variant-chips button {
   border: 1px solid var(--line-2);
@@ -699,8 +719,15 @@ main, .calendar, .grid { max-width: 100%; min-width: 0; }
     padding: 0.7rem;
   }
 
-  /* variant chips wrap nicely */
-  .variant-chips { gap: 0.3rem; }
+  /* variant chips wrap nicely. On narrow screens the group label
+     stacks above the row instead of sitting beside it. */
+  .variant-chips { gap: 0.35rem; }
+  .variant-group {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+  .variant-group-label { padding-top: 0; }
+  .variant-row { gap: 0.3rem; }
   .variant-chips button {
     font-size: 10px;
     padding: 0.2rem 0.5rem;
