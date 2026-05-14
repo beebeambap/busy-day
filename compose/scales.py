@@ -49,6 +49,9 @@ def chord_pitches(
     Voicing kinds:
       "triad"      : root + 3rd + 5th
       "seventh"    : triad + 7th
+      "ninth"      : seventh + 9th — the "tropical / café" colour the
+                     CLEAR HOT tape uses. 9th = 2nd scale degree one
+                     octave above the chord root.
       "open_fifth" : root + 5th (no third) — the "ancient/modal" Celtic
                      drone voicing the Muji store BGM leans on heavily
     `spread` controls the voicing's vertical span — a Muji-leaning lever
@@ -66,8 +69,13 @@ def chord_pitches(
         pitches = [root, fifth]
     else:
         pitches = [root, third, fifth]
-        if voicing == "seventh":
+        if voicing in ("seventh", "ninth"):
             pitches.append(degree_to_midi(key_root, mode, degree + 6,
+                                          base_octave=base_octave))
+        if voicing == "ninth":
+            # 9th = 2nd scale degree, one octave above the chord root.
+            # degree_to_midi handles the wrap (deg-1)//7 → extra octave.
+            pitches.append(degree_to_midi(key_root, mode, degree + 8,
                                           base_octave=base_octave))
 
     if spread == "wide" and len(pitches) >= 2:
