@@ -258,14 +258,19 @@ def compose_ir(
         bar_voicing = voicing
         if not is_final:
             if section == "B" and voicing == "triad":
-                if rng.random() < 0.30:
+                if rng.random() < 0.42:
                     bar_voicing = "seventh"
-            celtic_zone = (genre == "folk" and meter == "6/8"
-                           and section in ("INTRO", "A", "OUTRO"))
-            if celtic_zone and voicing == "triad" and rng.random() < 0.55:
-                bar_voicing = "open_fifth"
+            # Celtic open-fifth drone: the defining Muji-Celtic sound.
+            # Expanded to all folk meters (was 6/8 only) and added A_PRIME.
+            # 6/8 still has the highest probability (jig feel + drone = classic).
+            celtic_zone = (genre == "folk"
+                           and section in ("INTRO", "A", "A_PRIME", "OUTRO"))
+            if celtic_zone and voicing == "triad":
+                p_open = 0.60 if meter == "6/8" else 0.38
+                if rng.random() < p_open:
+                    bar_voicing = "open_fifth"
             elif genre == "ambient" and voicing == "triad" \
-                    and section != "B" and rng.random() < 0.25:
+                    and section != "B" and rng.random() < 0.32:
                 bar_voicing = "open_fifth"
 
         full_chord = chord_pitches(key, mode, chord_for_harmony,

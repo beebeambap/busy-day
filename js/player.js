@@ -105,53 +105,38 @@ function makeNylon(volume) {
   });
 }
 
-function _bowedStringSynth({ harmonicity, attack, release, volume }) {
-  // AMSynth voice with envelope shaped like a quick bow start. We
-  // intentionally drop the LFO-driven vibrato that was here before:
-  // (a) Tone.LFO.connect(PolySynth.detune) is fragile in Tone v14 and
-  //     was sometimes leaving the voice silent, and
-  // (b) the long attack times the previous version used to "feel
-  //     bowed" pushed every onset 200-450 ms behind the beat.
-  // Distinct tonal character is handled by harmonicity instead.
-  const synth = new Tone.PolySynth(Tone.AMSynth, {
-    harmonicity,
-    envelope: { attack, decay: 0.25, sustain: 0.80, release },
-    modulationEnvelope: {
-      attack: 0.01, decay: 0.15, sustain: 0.80, release: 0.4,
-    },
+// Bowed string synthesis using sawtooth oscillator + low-pass shaping.
+// Sawtooth approximates the harmonic content of a bowed string (both odd
+// and even partials). A low-pass filter sculpts the timbre per instrument:
+// violin is bright (~4kHz cutoff), cello is dark (~1800Hz). Vibrato is
+// applied as a Tone.Vibrato effect, not an LFO on detune, which is
+// compatible with PolySynth in v14.
+function _makeBowedString({ cutoffHz, attack, release, vibratoDepth, volume }) {
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sawtooth" },
+    envelope: { attack, decay: 0.2, sustain: 0.88, release },
   });
   synth.volume.value = volume;
-  return synth;
+  const filt    = new Tone.Filter({ frequency: cutoffHz, type: "lowpass", rolloff: -24 });
+  const vibrato = new Tone.Vibrato({ frequency: 5.0, depth: vibratoDepth, wet: 0.7 });
+  synth.chain(filt, vibrato);
+  return _withEffectChain(synth, vibrato);
 }
 
 function makeViolin(volume) {
-  // Bright (high harmonicity, lots of upper sidebands), fast bow.
-  return _bowedStringSynth({
-    harmonicity: 3,
-    attack: 0.04,    // 40 ms — quick bow start, lands on the beat
-    release: 0.6,
-    volume,
-  });
+  return _makeBowedString({ cutoffHz: 4000, attack: 0.05, release: 0.7,  vibratoDepth: 0.02, volume });
 }
 
 function makeViola(volume) {
-  // Mid range, slightly slower bow.
-  return _bowedStringSynth({
-    harmonicity: 2,
-    attack: 0.06,    // 60 ms
-    release: 0.7,
-    volume,
-  });
+  return _makeBowedString({ cutoffHz: 3000, attack: 0.08, release: 0.85, vibratoDepth: 0.025, volume });
 }
 
 function makeCello(volume) {
-  // Warm, deeper body. Still under one 16th-note at 80 BPM (188 ms).
-  return _bowedStringSynth({
-    harmonicity: 1,
-    attack: 0.08,    // 80 ms
-    release: 0.85,
-    volume,
-  });
+  // Cello: dark, warm register. Low-pass at 1800 Hz removes the sawtooth
+  // buzz above the cello's natural range, leaving the rich body (200-1800 Hz).
+  // 180 ms attack mimics drawing a bow across a low string. Vibrato at
+  // 4.8 Hz is slower and deeper than violin, characteristic of cello playing.
+  return _makeBowedString({ cutoffHz: 1800, attack: 0.18, release: 1.4, vibratoDepth: 0.03, volume });
 }
 
 // Backward-compatible: existing rows with instrument_id="strings" still
@@ -210,35 +195,25 @@ function _withEffectChain(synth, outputNode) {
 }
 
 function makeFlute(volume) {
-  // Breathy woodwind: AM-sine carrier (warmer than a plain sine, less
-  // edge than triangle8) + Vibrato for the bow-wobble + Chorus for the
-  // slight doubling that real flutes get from room ambience. Slower
-  // attack so each note has a perceptible "breath start" instead of a
-  // hard onset.
+  // Breathy woodwind: amsine with low harmonicity (0.5) keeps the tone
+  // warm — harmonicity 1.5 was creating metallic sidebands at 0.5f and
+  // 2.5f that sounded shrill. A gentle low-pass at 5kHz rounds off the
+  // remaining edge. Chorus depth and wet are halved from previous values
+  // so the doubling effect is a subtle room shimmer, not a harsh washer.
   const synth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: {
-      type:           "amsine",
-      harmonicity:    1.5,
-      modulationType: "sine",
-    },
-    envelope: { attack: 0.22, decay: 0.30, sustain: 0.78, release: 0.6 },
+    oscillator: { type: "amsine", harmonicity: 0.5, modulationType: "sine" },
+    envelope: { attack: 0.22, decay: 0.20, sustain: 0.82, release: 0.7 },
   });
   synth.volume.value = volume;
 
-  const vibrato = new Tone.Vibrato({
-    frequency: 5.0,
-    depth:     0.04,         // ±~7 cents — gentle wobble
-  });
-  const chorus = new Tone.Chorus({
-    frequency: 1.4,
-    delayTime: 4,
-    depth:     0.5,
-    feedback:  0.08,
-    spread:    180,
-    wet:       0.5,
+  const filt   = new Tone.Filter({ frequency: 5000, type: "lowpass", rolloff: -12 });
+  const vibrato = new Tone.Vibrato({ frequency: 5.0, depth: 0.03 });
+  const chorus  = new Tone.Chorus({
+    frequency: 1.2, delayTime: 3.5, depth: 0.22, feedback: 0.04,
+    spread: 180, wet: 0.28,
   }).start();
 
-  synth.chain(vibrato, chorus);
+  synth.chain(filt, vibrato, chorus);
   return _withEffectChain(synth, chorus);
 }
 
@@ -259,20 +234,20 @@ function makeMarimba(volume) {
 }
 
 function makeTinWhistle(volume) {
-  // Bright Irish whistle: AM-triangle gives a hollow, breathy tone
-  // with a fast attack so jigs sit on the beat, plus a gentle vibrato
-  // for the wobble that real whistles get when held.
+  // Irish tin whistle: hollow, slightly breathy tone. Triangle carrier
+  // is inherently softer than sawtooth; harmonicity 1.0 (no sidebands)
+  // keeps it clean and not metallic. Attack 70 ms gives the breath
+  // start without the hard click that 40 ms caused. A gentle low-pass
+  // at 6kHz cuts the very top edge without muffling the characteristic
+  // brightness.
   const synth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: {
-      type:           "amtriangle",
-      harmonicity:    1.2,
-      modulationType: "sine",
-    },
-    envelope: { attack: 0.04, decay: 0.18, sustain: 0.82, release: 0.35 },
+    oscillator: { type: "amtriangle", harmonicity: 1.0, modulationType: "sine" },
+    envelope: { attack: 0.07, decay: 0.15, sustain: 0.80, release: 0.4 },
   });
   synth.volume.value = volume;
-  const vibrato = new Tone.Vibrato({ frequency: 5.5, depth: 0.05 });
-  synth.chain(vibrato);
+  const filt   = new Tone.Filter({ frequency: 6000, type: "lowpass", rolloff: -12 });
+  const vibrato = new Tone.Vibrato({ frequency: 5.2, depth: 0.030 });
+  synth.chain(filt, vibrato);
   return _withEffectChain(synth, vibrato);
 }
 
@@ -307,7 +282,7 @@ const INSTRUMENT_FACTORIES = {
   harp:        (reverb) => { const s = makeHarp(-6);        s.connect(reverb); return s; },
   marimba:     (reverb) => { const s = makeMarimba(-6);     s.connect(reverb); return s; },
   music_box:   (reverb) => { const s = makeMusicBox(-4);    s.connect(reverb); return s; },
-  horn:      (reverb) => { const s = makeHorn(-10);      s.connect(reverb); return s; },
+  horn:      (reverb) => { const s = makeHorn(-14);      s.connect(reverb); return s; },
 };
 
 function makeUprightBass(volume) {
@@ -324,12 +299,16 @@ function makeUprightBass(volume) {
 }
 
 function makeAMPad(volume) {
+  // Attack was 0.6 s — for folk 1-beat notes (750 ms at 80 BPM) that
+  // left the pad barely audible. 0.28 s gives a smooth swell that
+  // actually reaches presence within a single beat. Release extended
+  // to 2.0 s so chords linger gently into the next beat.
   return new Tone.PolySynth(Tone.AMSynth, {
     harmonicity: 1.5,
-    envelope:   { attack: 0.6, decay: 0.4, sustain: 0.7, release: 1.6 },
+    envelope:   { attack: 0.28, decay: 0.4, sustain: 0.72, release: 2.0 },
     modulation: { type: "sine" },
     modulationEnvelope: {
-      attack: 0.8, decay: 0.2, sustain: 0.7, release: 1.2,
+      attack: 0.35, decay: 0.2, sustain: 0.7, release: 1.6,
     },
     volume,
   });
@@ -372,13 +351,18 @@ function makeDrone(volume) {
 }
 
 function makeStringPad(volume) {
+  // Attack was 1.2 s — neo_classical whole-note patterns are 3 s long
+  // so it worked, but ambient 2-beat patterns (1.5 s) barely audible.
+  // 0.55 s still feels like a slow string swell but lands inside a
+  // single bar. Switched to triangle4 (softer odd harmonics) to avoid
+  // the sawtooth4 brightness that pushed the pad into the melody band.
   return new Tone.PolySynth(Tone.AMSynth, {
-    harmonicity: 2,
-    oscillator: { type: "sawtooth4" },
-    envelope:   { attack: 1.2, decay: 0.5, sustain: 0.85, release: 2.6 },
+    harmonicity: 1.8,
+    oscillator: { type: "triangle4" },
+    envelope:   { attack: 0.55, decay: 0.5, sustain: 0.85, release: 2.8 },
     modulation: { type: "sine" },
     modulationEnvelope: {
-      attack: 1.4, decay: 0.4, sustain: 0.8, release: 2.0,
+      attack: 0.7, decay: 0.4, sustain: 0.8, release: 2.2,
     },
     volume,
   });
@@ -540,8 +524,12 @@ export function decideAmbience(weather, features) {
 }
 
 export function reverbWetFromHumidity(humidity) {
+  // 30% RH → 0.15 wet (dry), 90%+ RH → 0.38 wet (humid bloom).
+  // Tightened from the old 0.20–0.60 range — that was pushing rainy days
+  // into "cathedral" territory where chord tails overlapped the next
+  // chord, blurring the harmonic progression.
   const h = Number(humidity ?? 60);
-  return round2(0.20 + _clip01((h - 30) / 60) * 0.40);
+  return round2(0.15 + _clip01((h - 30) / 60) * 0.23);
 }
 
 function round1(x) { return Math.round(x * 10) / 10; }
@@ -729,13 +717,17 @@ function _paletteKey(song) {
 }
 
 function _buildHarmonyVoice(kind, reverb) {
+  // Previous volumes (-22/-18/-14 dB) were too quiet — harmony was
+  // essentially inaudible, especially after reverb wet mixing reduced
+  // the direct signal further. Raised by +6 to +8 dB so the chords
+  // are clearly present underneath the melody.
   switch (kind) {
-    case "string_pad": return makeStringPad(-18).connect(reverb);
-    case "harp_soft": { const s = makeHarp(-14); s.connect(reverb); return s; }
-    case "nylon_pad":  return makeNylon(-14).connect(reverb);
-    case "rhodes_pad": return makeRhodes(-18).connect(reverb);
+    case "string_pad": return makeStringPad(-12).connect(reverb);
+    case "harp_soft": { const s = makeHarp(-8); s.connect(reverb); return s; }
+    case "nylon_pad":  return makeNylon(-10).connect(reverb);
+    case "rhodes_pad": return makeRhodes(-12).connect(reverb);
     case "am_pad":
-    default:           return makeAMPad(-22).connect(reverb);
+    default:           return makeAMPad(-15).connect(reverb);
   }
 }
 
@@ -749,7 +741,14 @@ function _buildBassVoice(kind) {
 }
 
 function buildInstruments(genre, instrumentId, song) {
-  const reverb = toMaster(new Tone.Reverb({ decay: 3.6, wet: 0.34 }));
+  // Muji-cafe reverb: 2.2 s decay sits between a small studio (~1.5 s)
+  // and a small hall (~3 s). The previous 3.6 s was hall-sized — at
+  // 80 BPM that's ~5 beats of tail, so every chord's wash overlapped
+  // the next chord's attack, smearing the harmonic progression. ECM's
+  // "long resonance" feel comes from piano sustain pedal + space
+  // between notes, not from cathedral reverb tails.
+  // Default wet 0.22 sits closer to a recording mix than a live room.
+  const reverb = toMaster(new Tone.Reverb({ decay: 2.2, wet: 0.22 }));
   const ready  = [reverb.generate()];
   let needsSamples = false;       // becomes true if any voice uses Salamander
 
@@ -1135,10 +1134,22 @@ export class DetailPanel {
       else if (name.includes("drone")) inst = drone;
       else                             inst = melody;
 
+      const isMelody = inst === melody;
+      // Cello and horn melodies are generated at base_octave=5 (same as
+      // all other instruments). But the characteristic cello sound lives
+      // an octave lower (C3-C5 lyrical range, not C5-B5 thumb position),
+      // so we transpose melody notes down one octave at playback time.
+      // Horn similarly sits naturally in a lower register (F2-F5 range).
+      const melodyOctaveShift =
+        isMelody && (instrumentId === "cello" || instrumentId === "horn") ? -1 : 0;
+
       track.notes.forEach((note) => {
+        const noteName = melodyOctaveShift
+          ? Tone.Frequency(note.name).transpose(melodyOctaveShift * 12).toNote()
+          : note.name;
         Tone.Transport.schedule((time) => {
           inst.triggerAttackRelease(
-            note.name, note.duration, time, note.velocity * 0.85,
+            noteName, note.duration, time, note.velocity * 0.85,
           );
         }, t0 + note.time);
       });

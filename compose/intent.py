@@ -52,10 +52,10 @@ INTENTS: dict[str, Intent] = {
     "lively": Intent(
         id="lively",
         label_ko="활기차게",
-        deltas={"brightness": +0.30, "warmth": +0.10, "calmness": -0.30},
-        preferred_genre="bossa_nova",
+        deltas={"brightness": +0.25, "warmth": +0.10, "calmness": -0.20},
+        preferred_genre="folk",           # bossa_nova at 112 BPM was outside Muji range
         avoid_genres=("ambient", "lo_fi"),
-        bpm_clamp=(92, 112),
+        bpm_clamp=(86, 100),              # was (92, 112); 100 BPM is upbeat but still musical
     ),
     "after_rain": Intent(
         id="after_rain",
