@@ -21,7 +21,8 @@ const CORS_HEADERS = {
 // Keep in sync with compose/tapes/presets.py PRESETS keys.
 const TAPE_IDS = new Set([
   "clear_hot",
-  // planned: "rain", "cold", "snow", "fog", "storm"
+  "rain",
+  // planned: "cold", "snow", "fog", "storm"
 ]);
 
 const UUID_RE =
