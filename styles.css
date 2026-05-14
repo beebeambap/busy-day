@@ -576,6 +576,36 @@ main {
 }
 .variant-chips button:hover:not(.active) { background: #f1ede5; }
 
+/* Tape-child badges inside an original chip — small icons that mark
+   which weather tapes have been derived from this song. Purely
+   informational (no click handler); clicking the parent chip behaves
+   as usual. */
+.tape-children {
+  display: inline-flex;
+  gap: 0.1rem;
+  margin-left: 0.4rem;
+  font-size: 10px;
+  opacity: 0.78;
+  line-height: 1;
+  vertical-align: baseline;
+}
+.tape-child-icon { line-height: 1; }
+
+/* Source-chip indicators for parent-child relationships:
+   - .source-hover: temporary ring while user hovers/focuses a tape
+     chip (desktop nice-to-have)
+   - .is-source-of-active: persistent ring on the original chip when
+     the currently-active variant is a tape derived from it. Works
+     on mobile too since it's tied to selection, not pointer state. */
+.variant-chips button.source-hover,
+.variant-chips button.is-source-of-active {
+  outline: 1.5px solid var(--fg);
+  outline-offset: 2px;
+}
+.variant-chips button.is-source-of-active {
+  background: rgba(20, 18, 14, 0.05);
+}
+
 /* ── calendar variant count badge ────────────────────────── */
 .cell .count {
   position: absolute;

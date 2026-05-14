@@ -1281,6 +1281,23 @@ export class DetailPanel {
     const originals = this.variants.filter((v) => !v.tape_id);
     const tapes     = this.variants.filter((v) =>  v.tape_id);
 
+    // Build an "originalId -> tape children" map once so each original
+    // chip can show small icon badges for its derived tape variants.
+    const childrenOf = new Map();
+    for (const t of tapes) {
+      if (!t.source_song_id) continue;
+      const arr = childrenOf.get(t.source_song_id) || [];
+      arr.push(t);
+      childrenOf.set(t.source_song_id, arr);
+    }
+
+    // Helper that finds a button by song-id within the chips container.
+    // Used by tape-chip hover handlers to ring the source chip on hover
+    // and by the active-state pass below to mark "this original is the
+    // source of the currently-playing tape".
+    const findChipById = (songId) =>
+      this.variantsEl.querySelector(`button[data-song-id="${songId}"]`);
+
     const renderGroup = (label, items) => {
       if (!items.length) return;
       const group = document.createElement("div");
@@ -1296,8 +1313,51 @@ export class DetailPanel {
       for (const v of items) {
         const b = document.createElement("button");
         b.type = "button";
-        b.textContent = variantLabel(v, this.variants);
+        b.dataset.songId = v.id;
+        if (v.source_song_id) b.dataset.sourceId = v.source_song_id;
+
+        // Main label span — the chip's text content
+        const labelSpan = document.createElement("span");
+        labelSpan.textContent = variantLabel(v, this.variants);
+        b.appendChild(labelSpan);
+
+        // For originals: append small icon badges for each tape that
+        // was derived from this song. Lets the listener scan one row
+        // and see "this 산책 has 🌧 and 🌞 versions" at a glance.
+        if (!v.tape_id) {
+          const kids = childrenOf.get(v.id);
+          if (kids && kids.length) {
+            const badges = document.createElement("span");
+            badges.className = "tape-children";
+            for (const t of kids) {
+              const meta = TAPE_LABELS[t.tape_id] || {};
+              const ic = document.createElement("span");
+              ic.className = "tape-child-icon";
+              ic.textContent = meta.icon || "🎵";
+              ic.title = `${meta.label || t.tape_id} 편곡 존재`;
+              badges.appendChild(ic);
+            }
+            b.appendChild(badges);
+          }
+        }
+
         if (v.id === this.song.id) b.classList.add("active");
+
+        // Tape-chip hover/focus: ring the source chip so the
+        // parent-child link is visible from both directions.
+        // (Mobile relies on the persistent .is-source-of-active mark
+        // added below; hover is a desktop nice-to-have.)
+        if (v.tape_id && v.source_song_id) {
+          const ringOn  = () => findChipById(v.source_song_id)
+                                  ?.classList.add("source-hover");
+          const ringOff = () => findChipById(v.source_song_id)
+                                  ?.classList.remove("source-hover");
+          b.addEventListener("mouseenter", ringOn);
+          b.addEventListener("mouseleave", ringOff);
+          b.addEventListener("focus",      ringOn);
+          b.addEventListener("blur",       ringOff);
+        }
+
         b.addEventListener("click", () => {
           if (v.id === this.song.id) return;
           this.swapTo(v);
@@ -1310,6 +1370,15 @@ export class DetailPanel {
 
     renderGroup("원곡", originals);
     renderGroup("편곡", tapes);
+
+    // After both rows are in the DOM: if the active variant is a tape,
+    // mark its source chip so the listener immediately sees which
+    // original this arrangement came from. Stays through chip swaps;
+    // the next renderVariantChips() rebuild clears it.
+    if (this.song?.tape_id && this.song?.source_song_id) {
+      findChipById(this.song.source_song_id)
+        ?.classList.add("is-source-of-active");
+    }
   }
 
   swapTo(song) {
