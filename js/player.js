@@ -1,4 +1,5 @@
 import { publicUrl, recordPlay, updateSongNotes } from "./api.js";
+import { matchWeatherTape, TAPE_LABELS, tapeChipLabel } from "./tapes.js";
 import * as Tone from "https://esm.sh/tone@14.8.49";
 import { Midi } from "https://esm.sh/@tonejs/midi@2.0.28";
 
@@ -952,6 +953,10 @@ const INSTRUMENT_LABELS = {
 };
 
 function variantLabel(song) {
+  // Tape variants take priority over intent/instrument labels — the
+  // tape identity is the user's mental model for these rows.
+  const tapeLabel = tapeChipLabel(song);
+  if (tapeLabel) return tapeLabel;
   if (song.variant_id === "auto") return "오늘";
   const parts = [];
   if (song.intent_id && INTENT_LABELS[song.intent_id]) {
@@ -964,12 +969,14 @@ function variantLabel(song) {
 }
 
 export class DetailPanel {
-  constructor({ root }) {
+  constructor({ root, onTapeTrigger = null }) {
     this.root        = root;
     this.dateEl      = root.querySelector("#detail-date");
     this.metaEl      = root.querySelector("#detail-meta");
     this.createdEl   = root.querySelector("#detail-created");
     this.variantsEl  = root.querySelector("#detail-variants");
+    this.tapeActionEl = root.querySelector("#detail-tape-action");
+    this.tapeBtn     = root.querySelector("#tape-btn");
     this.scoreEl     = root.querySelector("#detail-score");
     this.scoreEmpty  = root.querySelector("#detail-score-empty");
     this.statusEl    = root.querySelector("#player-status");
@@ -982,6 +989,11 @@ export class DetailPanel {
     this.titleInput  = root.querySelector("#detail-title");
     this.notesInput  = root.querySelector("#detail-notes");
     this.memoStatus  = root.querySelector("#detail-memo-status");
+
+    // Tape trigger lives in main.js so it can share the progress popup
+    // and calendar refresh with the intent flow. We just call back when
+    // the user clicks the button.
+    this.onTapeTrigger = onTapeTrigger;
 
     this.midi = null;
     this.duration = 0;
@@ -1007,6 +1019,51 @@ export class DetailPanel {
     });
 
     this.playBtn.addEventListener("click", () => this.togglePlayback());
+
+    if (this.tapeBtn) {
+      this.tapeBtn.addEventListener("click", () => this._onTapeClick());
+    }
+  }
+
+  // Show the "편곡하기" button when:
+  //   1. the current variant isn't already a tape (no infinite loop)
+  //   2. the day's weather matches a known tape preset
+  // The button label is rebuilt each time so future presets (RAIN,
+  // SNOW, ...) just need to be registered in js/tapes.js TAPE_LABELS.
+  _renderTapeAction(song) {
+    if (!this.tapeActionEl || !this.tapeBtn) return;
+    const isTape = !!song?.tape_id;
+    const candidate = isTape ? null : matchWeatherTape(song?.weather);
+    if (!candidate) {
+      this.tapeActionEl.hidden = true;
+      this.tapeBtn.dataset.tapeId = "";
+      return;
+    }
+    const meta = TAPE_LABELS[candidate] || { icon: "🎵", label: candidate, short: candidate };
+    this.tapeBtn.dataset.tapeId = candidate;
+    this.tapeBtn.disabled = false;
+    this.tapeBtn.querySelector(".tape-icon").textContent = meta.icon;
+    this.tapeBtn.querySelector(".tape-label").textContent = "편곡하기";
+    this.tapeBtn.querySelector(".tape-sub").textContent = `${meta.label} 톤`;
+    this.tapeActionEl.hidden = false;
+  }
+
+  async _onTapeClick() {
+    if (!this.onTapeTrigger || !this.song) return;
+    const tapeId = this.tapeBtn?.dataset.tapeId;
+    if (!tapeId) return;
+    // Source the tape from whatever variant the user is currently
+    // viewing (it's still on the same date/key/melody as any sibling).
+    // Pass the date along so main.js doesn't have to look it up.
+    const sourceId   = this.song.id;
+    const sourceDate = this.song.date;
+    this.tapeBtn.disabled = true;
+    try {
+      await this.onTapeTrigger({ sourceId, sourceDate, tapeId });
+    } finally {
+      // re-enabled by the next _renderTapeAction() call on swap/open
+      if (this.tapeBtn) this.tapeBtn.disabled = false;
+    }
   }
 
   open(song, variants = null) {
@@ -1017,6 +1074,7 @@ export class DetailPanel {
     this.metaEl.textContent = fmtMeta(song);
     this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
     this.renderVariantChips();
+    this._renderTapeAction(song);
     this.renderMemo(song);
 
     const svgUrl = publicUrl(song.paths?.svg);
@@ -1219,6 +1277,7 @@ export class DetailPanel {
     this.song = song;
     this.metaEl.textContent = fmtMeta(song);
     this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
+    this._renderTapeAction(song);
     this.renderMemo(song);
 
     const svgUrl = publicUrl(song.paths?.svg);
