@@ -1,0 +1,55 @@
+name: tape compose
+
+# Triggered by the trigger_tape Edge Function (workflow_dispatch).
+# Reads the source song's IR from Supabase Storage, applies the chosen
+# weather tape preset, renders MIDI + SVG, and inserts a new songs row.
+#
+# No KMA fetch needed — the source song already carries the weather it
+# was composed against.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_id:
+        description: "UUID of the source song to re-arrange"
+        type: string
+        required: true
+      tape:
+        description: "tape preset id (clear_hot)"
+        type: string
+        required: true
+      variant:
+        description: "variant id for the new row (e.g. tape-clear_hot-1530)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  arrange:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mido verovio requests
+
+      - name: Transform & upload
+        env:
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_STORAGE_BUCKET:   busy-day-archive
+        run: |
+          python -m compose tape \
+            --source-id "${{ github.event.inputs.source_id }}" \
+            --tape      "${{ github.event.inputs.tape      }}" \
+            --variant   "${{ github.event.inputs.variant   }}"

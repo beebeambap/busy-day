@@ -118,6 +118,16 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:
         pass
 
+    # `tape` is the weather-tape arrangement pipeline (source IR ->
+    # transform -> render -> upload). Registered conditionally so the
+    # generate-only CLI still works in environments without the tapes
+    # module loaded.
+    try:
+        from .tapes.cli import register as register_tape
+        register_tape(sub)
+    except Exception:
+        pass
+
     args = p.parse_args(argv)
     return args.func(args)
 

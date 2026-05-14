@@ -67,6 +67,19 @@ class Supabase:
         with open(local_path, "rb") as fh:
             return self.put_file(key, fh.read(), **kw)
 
+    def get_file(self, key: str) -> bytes:
+        """Download a file from the Storage bucket. Used by the tape
+        pipeline to read the source song's IR JSON before transforming.
+        The bucket is public-read, but we use the authenticated path
+        anyway so private buckets work without code changes."""
+        endpoint = f"{self.url}/storage/v1/object/{self.bucket}/{key}"
+        r = requests.get(endpoint, headers=self._hdr, timeout=30)
+        if r.status_code >= 300:
+            raise RuntimeError(
+                f"storage get {key} failed: {r.status_code} {r.text}"
+            )
+        return r.content
+
     # ── postgrest ──────────────────────────────────────────────────
     def upsert_row(self, table: str, row: dict, *,
                    on_conflict: str | None = None) -> dict:
