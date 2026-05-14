@@ -23,7 +23,9 @@ from ..comping import (
     percussion_pattern_for,
 )
 from ..humanize import (
+    apply_groove_delay,
     apply_outro_decay,
+    apply_swing,
     apply_velocity_curve,
     pedal_segments,
 )
@@ -277,6 +279,25 @@ def transform_ir(
             shift = target_base - avg_vel
             for ev in melody_events:
                 ev["vel"] = max(28, min(110, int(round(ev["vel"] + shift))))
+
+    # ── groove: swing + behind-the-beat ────────────────────────────
+    # Applied AFTER velocity curves and BEFORE pedal/signature calcs so
+    # the new timings are reflected in the rendered output. Order:
+    #   1. swing first  — re-times the eighth grid
+    #   2. groove-delay — shifts everything (except percussion) later
+    # so we don't accidentally undo swing by delaying twice. Percussion
+    # is excluded from groove-delay because the drummer is the time
+    # reference even when the soloist drags.
+    if preset.swing_ratio and preset.swing_ratio > 1.0:
+        for track in (melody_events, harmony_events, bass_events,
+                      percussion_events):
+            apply_swing(track, ratio=preset.swing_ratio)
+    if preset.groove_delay_ms > 0.0:
+        # Convert ms to beats using the *tape's* (post-multiplier) BPM:
+        # delay_beats = delay_ms × (BPM / 60_000)
+        delay_beats = (preset.groove_delay_ms * new_bpm) / 60_000.0
+        for track in (melody_events, harmony_events, bass_events):
+            apply_groove_delay(track, delay_beats=delay_beats)
 
     pedals = pedal_segments(
         genre=new_genre, total_bars=total_bars,

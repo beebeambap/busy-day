@@ -46,6 +46,15 @@ class TapePreset:
       melody_instrument  optional override (None = use genre default)
       velocity_profile   {"melody": (base, span), "harmony": (b,s),
                           "bass": (b,s)} — used by apply_velocity_curve
+
+    Optional groove transforms:
+      swing_ratio        if set (e.g. 1.50 for ballad, 1.67 for standard,
+                         2.0 for triplet swing), eighth notes get re-timed
+                         to the swung long-short pair. Anything ≤ 1.0
+                         disables swing (straight eighths).
+      groove_delay_ms    if > 0, every non-percussion event is shifted
+                         later by this many ms (converted to beats using
+                         the tape's BPM). Used for "behind-the-beat" feel.
     """
     id: str
     label_ko: str
@@ -54,6 +63,8 @@ class TapePreset:
     bpm_multiplier: float
     melody_instrument: Optional[str] = None
     velocity_profile: dict = field(default_factory=dict)
+    swing_ratio: Optional[float] = None
+    groove_delay_ms: float = 0.0
 
 
 # ── presets ────────────────────────────────────────────────────────
@@ -98,8 +109,6 @@ RAIN = TapePreset(
     # pulse reinforces the "창가에서 빗소리 들으며" stillness.
     bpm_multiplier=0.88,
     # Salamander grand piano: the Keith Jarrett "café piano" timbre.
-    # When swing + groove-delay primitives land later, those will be
-    # applied here too (per design doc; not in v1).
     melody_instrument="piano",
     velocity_profile={
         # Right hand pp–mp so it floats; left hand quieter still so
@@ -108,6 +117,15 @@ RAIN = TapePreset(
         "harmony": (40, 18),
         "bass":    (44, 18),
     },
+    # "미세 스윙": 1.50 ratio (3:2) is a soft "ballad swing" — present
+    # but not the pronounced 2:1 hard-bop swing. The eighth pair
+    # becomes 0.6:0.4 of a beat. Right for "카페 창가" feel.
+    swing_ratio=1.50,
+    # "비트를 약간 뒤로": +18 ms at the tape's BPM. At RAIN's typical
+    # 70 BPM (after the 0.88 × multiplier on ~80 BPM sources) that's
+    # 18/857 ≈ 0.021 beats — barely perceptible per note but adds the
+    # "lazy drag" feel when accumulated across the whole performance.
+    groove_delay_ms=18.0,
 )
 
 
