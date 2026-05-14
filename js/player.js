@@ -524,8 +524,12 @@ export function decideAmbience(weather, features) {
 }
 
 export function reverbWetFromHumidity(humidity) {
+  // 30% RH → 0.15 wet (dry), 90%+ RH → 0.38 wet (humid bloom).
+  // Tightened from the old 0.20–0.60 range — that was pushing rainy days
+  // into "cathedral" territory where chord tails overlapped the next
+  // chord, blurring the harmonic progression.
   const h = Number(humidity ?? 60);
-  return round2(0.20 + _clip01((h - 30) / 60) * 0.40);
+  return round2(0.15 + _clip01((h - 30) / 60) * 0.23);
 }
 
 function round1(x) { return Math.round(x * 10) / 10; }
@@ -737,7 +741,14 @@ function _buildBassVoice(kind) {
 }
 
 function buildInstruments(genre, instrumentId, song) {
-  const reverb = toMaster(new Tone.Reverb({ decay: 3.6, wet: 0.34 }));
+  // Muji-cafe reverb: 2.2 s decay sits between a small studio (~1.5 s)
+  // and a small hall (~3 s). The previous 3.6 s was hall-sized — at
+  // 80 BPM that's ~5 beats of tail, so every chord's wash overlapped
+  // the next chord's attack, smearing the harmonic progression. ECM's
+  // "long resonance" feel comes from piano sustain pedal + space
+  // between notes, not from cathedral reverb tails.
+  // Default wet 0.22 sits closer to a recording mix than a live room.
+  const reverb = toMaster(new Tone.Reverb({ decay: 2.2, wet: 0.22 }));
   const ready  = [reverb.generate()];
   let needsSamples = false;       // becomes true if any voice uses Salamander
 
