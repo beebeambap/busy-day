@@ -1258,17 +1258,43 @@ export class DetailPanel {
       return;
     }
     this.variantsEl.hidden = false;
-    for (const v of this.variants) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.textContent = variantLabel(v);
-      if (v.id === this.song.id) b.classList.add("active");
-      b.addEventListener("click", () => {
-        if (v.id === this.song.id) return;
-        this.swapTo(v);
-      });
-      this.variantsEl.appendChild(b);
-    }
+
+    // Split into originals (no tape_id) and tape arrangements so the
+    // listener's mental model is clear: originals are independent
+    // recordings of the day; tapes are rearrangements derived from
+    // one of those originals (same melody, different palette).
+    const originals = this.variants.filter((v) => !v.tape_id);
+    const tapes     = this.variants.filter((v) =>  v.tape_id);
+
+    const renderGroup = (label, items) => {
+      if (!items.length) return;
+      const group = document.createElement("div");
+      group.className = "variant-group";
+
+      const lab = document.createElement("span");
+      lab.className = "variant-group-label";
+      lab.textContent = label;
+      group.appendChild(lab);
+
+      const row = document.createElement("div");
+      row.className = "variant-row";
+      for (const v of items) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = variantLabel(v);
+        if (v.id === this.song.id) b.classList.add("active");
+        b.addEventListener("click", () => {
+          if (v.id === this.song.id) return;
+          this.swapTo(v);
+        });
+        row.appendChild(b);
+      }
+      group.appendChild(row);
+      this.variantsEl.appendChild(group);
+    };
+
+    renderGroup("원곡", originals);
+    renderGroup("편곡", tapes);
   }
 
   swapTo(song) {
