@@ -1,5 +1,5 @@
 import { publicUrl, recordPlay, updateSongNotes } from "./api.js";
-import { matchWeatherTape, TAPE_LABELS, tapeChipLabel } from "./tapes.js";
+import { matchWeatherTape, TAPE_LABELS } from "./tapes.js";
 import * as Tone from "https://esm.sh/tone@14.8.49";
 import { Midi } from "https://esm.sh/@tonejs/midi@2.0.28";
 
@@ -952,11 +952,26 @@ const INSTRUMENT_LABELS = {
   horn:        "호른",
 };
 
-function variantLabel(song) {
-  // Tape variants take priority over intent/instrument labels — the
-  // tape identity is the user's mental model for these rows.
-  const tapeLabel = tapeChipLabel(song);
-  if (tapeLabel) return tapeLabel;
+function variantLabel(song, allVariants = null) {
+  // Tape variant: borrow the source song's name so the chip reads
+  // like "🌞 산책 (편곡)" rather than the generic preset label. The
+  // weather-condition emoji at the front signals which preset was
+  // applied. Falls back to the preset's own short label when the
+  // source song isn't in the variant list (e.g. cross-day tapes).
+  if (song.tape_id) {
+    const meta = TAPE_LABELS[song.tape_id] || {};
+    const icon = meta.icon || "🎵";
+    let sourceName = meta.short || song.tape_id;
+    if (allVariants && song.source_song_id) {
+      const source = allVariants.find((v) => v.id === song.source_song_id);
+      if (source && !source.tape_id) {
+        // Recurse-safe: source is an original (no tape_id), so the
+        // inner call hits the original branch below.
+        sourceName = variantLabel(source);
+      }
+    }
+    return `${icon} ${sourceName} (편곡)`;
+  }
   if (song.variant_id === "auto") return "오늘";
   const parts = [];
   if (song.intent_id && INTENT_LABELS[song.intent_id]) {
@@ -1281,7 +1296,7 @@ export class DetailPanel {
       for (const v of items) {
         const b = document.createElement("button");
         b.type = "button";
-        b.textContent = variantLabel(v);
+        b.textContent = variantLabel(v, this.variants);
         if (v.id === this.song.id) b.classList.add("active");
         b.addEventListener("click", () => {
           if (v.id === this.song.id) return;

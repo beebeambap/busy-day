@@ -11,12 +11,12 @@
 
 export const TAPE_LABELS = {
   clear_hot: { label: "맑고 더운 날", icon: "🌞", short: "맑고 더운 날 편곡" },
+  rain:      { label: "비 오는 날",   icon: "🌧", short: "비 오는 날 편곡" },
   // planned (designed in weather-tapes-arrangement-system-v1.md):
-  // rain  : "비 오는 날",  ☔
-  // cold  : "한파",         🌡
-  // snow  : "눈 오는 날",   ❄️
-  // fog   : "흐린 날",      🌫
-  // storm : "폭풍",         🌩
+  // cold  : "한파",       🌡
+  // snow  : "눈 오는 날", ❄️
+  // fog   : "흐린 날",    🌫
+  // storm : "폭풍",       🌩
 };
 
 // Mirror of compose/tapes/presets.py::match_weather()
@@ -33,14 +33,12 @@ export function matchWeatherTape(weather) {
     return "clear_hot";
   }
 
+  // RAIN: meaningful rain + overcast. Temperature-agnostic in v1.
+  // Future COLD preset will take the freezing rainy days.
+  if (precip >= 0.3 && cloud >= 50.0) {
+    return "rain";
+  }
+
   return null;
 }
 
-// Pretty label for a tape variant row (used in variant chips).
-// Returns "" when the song isn't a tape variant.
-export function tapeChipLabel(song) {
-  if (!song?.tape_id) return "";
-  const t = TAPE_LABELS[song.tape_id];
-  if (!t) return song.tape_id;
-  return `${t.icon} ${t.short}`;
-}
