@@ -95,6 +95,87 @@ def apply_micro_timing(
     return events
 
 
+def apply_swing(events: list[dict], *, ratio: float = 1.67) -> list[dict]:
+    """Re-time straight eighth notes as swung eighth pairs.
+
+    Standard jazz swing: the "long-short" pair where the downbeat-
+    eighth lasts a 2/3-of-a-beat (or 3/5 for a more subtle "ballad
+    swing"), and the off-beat-eighth lasts the remaining 1/3.
+
+    `ratio` is the long:short proportion:
+        2.00 → triplet swing (hard bop, fast)
+        1.67 → standard swing
+        1.50 → soft swing (ballad)
+        1.00 → straight eighths (no-op)
+
+    Algorithm:
+      - For each event with start_beat at the off-eighth of a beat
+        (frac ≈ 0.5), shift to `beat + long_frac` where
+        long_frac = ratio / (ratio + 1).
+      - If the event has eighth-note duration (~0.5), shorten it to
+        `(1 - long_frac)`, the off-eighth's swung duration.
+      - For events ON the downbeat with eighth-note duration, extend
+        the duration to `long_frac` so the downbeat eighth lasts the
+        full long-portion of the swung pair.
+
+    Sixteenths, quarters, halves, and any non-eighth subdivision are
+    left untouched — swing is a property of the eighth-note grid.
+    """
+    if ratio <= 1.0:
+        return events
+    long_frac  = ratio / (ratio + 1.0)
+    short_frac = 1.0 - long_frac
+
+    for ev in events:
+        b = ev.get("start_beat")
+        if b is None:
+            continue
+        int_b = int(b)
+        frac  = b - int_b
+        d = ev.get("dur_beats", 0.0)
+        is_eighth_dur = abs(d - 0.5) < 0.05
+
+        # off-eighth (0.5): shift to long_frac inside the beat
+        if abs(frac - 0.5) < 0.05:
+            ev["start_beat"] = round(int_b + long_frac, 4)
+            if is_eighth_dur:
+                ev["dur_beats"] = round(short_frac, 4)
+        # downbeat eighth: stretch dur to long_frac
+        elif abs(frac) < 0.05 and is_eighth_dur:
+            ev["dur_beats"] = round(long_frac, 4)
+    return events
+
+
+def apply_groove_delay(
+    events: list[dict],
+    *,
+    delay_beats: float,
+    skip_kinds: tuple[str, ...] = (),
+) -> list[dict]:
+    """Shift every event later by `delay_beats`.
+
+    Used to push the performance slightly behind the beat — the "lazy
+    drag" feel of RAIN's café-jazz preset (design doc: "비트를 약간
+    뒤로"). A typical value at 80 BPM is +18 ms = ~0.024 beats; the
+    caller is responsible for converting ms ↔ beats given the song's
+    tempo.
+
+    `skip_kinds` lets the caller exclude tracks that should remain on
+    the grid (typically percussion, since the drummer is the timing
+    reference even when the soloist drags).
+    """
+    if delay_beats <= 0.0:
+        return events
+    for ev in events:
+        if ev.get("kind") in skip_kinds:
+            continue
+        b = ev.get("start_beat")
+        if b is None:
+            continue
+        ev["start_beat"] = round(b + delay_beats, 4)
+    return events
+
+
 def apply_grace_notes(
     events: list[dict],
     rng: Random,
