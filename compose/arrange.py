@@ -181,6 +181,17 @@ def _spread_for(warmth: float) -> str:
     return "default"
 
 
+def _third_below_diatonic(deg: int, oct_shift: int) -> tuple[int, int]:
+    """Return (degree, octave_shift) for the diatonic third below the
+    given scale-degree. Handles octave wrap when deg-2 would dip below
+    the first scale degree (e.g. tonic → 6th in the octave below)."""
+    h = deg - 2
+    while h < 1:
+        h += 7
+        oct_shift -= 1
+    return h, oct_shift
+
+
 def compose_ir(
     *,
     date_iso: str,
@@ -277,7 +288,14 @@ def compose_ir(
 
         if play_melody:
             t = 0.0
-            for deg, oct_shift, dur in mel_notes:
+            # Probability that a non-downbeat melody note picks up a
+            # parallel third below. The bar's first note is ALWAYS
+            # harmonized (when long enough) so the listener gets a
+            # reliable "chord on every downbeat" feel; the rest scale
+            # with activity so calm songs stay sparse and active songs
+            # ring as full two-voice piano.
+            extra_harmonize_p = 0.20 + activity_factor * 0.35
+            for note_idx, (deg, oct_shift, dur) in enumerate(mel_notes):
                 pitch = degree_to_midi(key, mode, deg, octave_shift=oct_shift,
                                        base_octave=5)
                 if 36 <= pitch <= 96:
@@ -291,6 +309,38 @@ def compose_ir(
                         "dur_beats": round(dur, 4),
                         "vel": vel,
                     })
+
+                    # Right-hand harmonization (parallel third below).
+                    # Two paths:
+                    #   - bar's first note + dur ≥ 0.35  → always
+                    #   - any other note  + dur ≥ 0.35   → probabilistic
+                    # The 0.35 threshold lets us catch notes that have
+                    # been shortened by _apply_activity_density (a 1.0
+                    # original note splits into 0.6 + 0.4).
+                    should_harmonize = False
+                    if dur >= 0.35:
+                        if note_idx == 0:
+                            should_harmonize = True
+                        elif rng.random() < extra_harmonize_p:
+                            should_harmonize = True
+
+                    if should_harmonize:
+                        h_deg, h_oct = _third_below_diatonic(deg, oct_shift)
+                        h_pitch = degree_to_midi(
+                            key, mode, h_deg,
+                            octave_shift=h_oct, base_octave=5,
+                        )
+                        # Stay below the melody note and above the bass
+                        # (MIDI 48 = C3) so the texture doesn't muddy.
+                        if 48 <= h_pitch < pitch:
+                            h_vel = max(35, vel - 12)
+                            melody_events.append({
+                                "bar": cur_bar,
+                                "start_beat": round(t, 4),
+                                "pitch": h_pitch,
+                                "dur_beats": round(dur, 4),
+                                "vel": h_vel,
+                            })
                 t += dur
 
         # ── harmony comping (rhythmic left hand). Final bar is forced
