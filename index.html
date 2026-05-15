@@ -44,6 +44,9 @@
         <option value="cold">추운 날</option>
         <option value="hot">더운 날</option>
         <option value="humid">습한 날</option>
+        <option disabled>──────</option>
+        <option value="pin_legendary">⭐ 레전더리</option>
+        <option value="pin_worst">👎 워스트</option>
       </select>
     </div>
 
@@ -144,6 +147,15 @@
                   placeholder="이 곡에 대한 짧은 메모…"></textarea>
         <p id="detail-memo-status" class="muted small">—</p>
       </section>
+
+      <div id="detail-pin" class="pin-bar">
+        <button id="pin-legendary-btn" type="button" class="pin-btn" data-pin="legendary">
+          <span class="pin-icon">⭐</span> 레전더리
+        </button>
+        <button id="pin-worst-btn" type="button" class="pin-btn" data-pin="worst">
+          <span class="pin-icon">👎</span> 워스트
+        </button>
+      </div>
 
       <ul class="downloads" id="detail-downloads"></ul>
     </div>

@@ -234,6 +234,7 @@ function boot() {
   const detail = new DetailPanel({
     root:          $("detail"),
     onTapeTrigger: runTapeTrigger,
+    onPinChange:   () => cal.render(),
   });
 
   const cal = new CalendarView({
