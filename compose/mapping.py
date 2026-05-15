@@ -113,7 +113,11 @@ def pick_meter(rng: Random, genre: str) -> str:
     if genre == "bossa_nova":
         return "4/4"
     if genre == "folk":
-        return _weighted_choice(rng, ["3/4", "4/4", "6/8"], [0.45, 0.4, 0.15])
+        # Tilted toward 4/4 from the previous [0.45, 0.40, 0.15]. 3/4
+        # waltzes were dominating folk picks and dragging the perceived
+        # energy of any folk song down — most listeners hear folk as
+        # boom-chick (4/4), not waltz (3/4).
+        return _weighted_choice(rng, ["3/4", "4/4", "6/8"], [0.30, 0.55, 0.15])
     if genre == "ambient":
         return _weighted_choice(rng, ["4/4", "6/8"], [0.6, 0.4])
     return _weighted_choice(rng, METERS, [0.20, 0.65, 0.15])

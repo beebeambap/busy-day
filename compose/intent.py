@@ -24,6 +24,10 @@ class Intent:
     avoid_genres: tuple[str, ...] = ()
     mode_bias: Optional[str] = None    # only ionian/dorian/lydian/mixolydian
     bpm_clamp: Optional[tuple[int, int]] = None
+    # Override the genre-driven meter pick. Used by intents whose mental
+    # model implies a specific subdivision (산책 = 4/4 boom-chick aligned
+    # with footsteps; a 3/4 walking song feels mismatched).
+    force_meter: Optional[str] = None    # "3/4" | "4/4" | "6/8"
 
 
 INTENTS: dict[str, Intent] = {
@@ -89,8 +93,11 @@ INTENTS: dict[str, Intent] = {
     "commute": Intent(
         id="commute",
         label_ko="출근길",
-        deltas={"brightness": +0.10, "calmness": -0.10},
-        bpm_clamp=(75, 88),
+        deltas={"brightness": +0.10, "calmness": -0.20},
+        # Bumped from (75, 88). Real morning commute energy needs more
+        # forward push — a 75 BPM song feels like a sleepy yoga class,
+        # not a walk-to-the-subway pulse.
+        bpm_clamp=(90, 104),
     ),
     "nap": Intent(
         id="nap",
@@ -104,14 +111,25 @@ INTENTS: dict[str, Intent] = {
         label_ko="작업 중",
         deltas={"brightness": +0.05, "calmness": +0.10},
         avoid_genres=("bossa_nova",),    # too "songy" for background work
-        bpm_clamp=(70, 84),
+        # Slight bump from (70, 84). Background music should not drag
+        # so much that it pulls the listener toward sleep.
+        bpm_clamp=(74, 90),
     ),
     "walk": Intent(
         id="walk",
         label_ko="산책",
-        deltas={"brightness": +0.15, "warmth": +0.10, "calmness": -0.05},
+        # calmness pushed harder negative so density modulation kicks in
+        # (active intents trigger more passing tones — see arrange.py
+        # _apply_activity_density).
+        deltas={"brightness": +0.15, "warmth": +0.10, "calmness": -0.25},
         preferred_genre="folk",
-        bpm_clamp=(78, 94),
+        # Centered around 119 BPM — matches a typical brisk walking
+        # cadence (110-125 steps per minute). Was (78, 94) — too slow,
+        # felt like meditation rather than walking.
+        bpm_clamp=(114, 124),
+        # 4/4 boom-chick aligns with footsteps; 3/4 (waltz) and 6/8
+        # both miss the walking pulse for the listener's mental model.
+        force_meter="4/4",
     ),
 }
 

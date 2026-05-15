@@ -50,12 +50,21 @@ def _decide_spec(
     genre = pick_genre(s("genre"), features,
                       avoid=eff_avoid, preferred=pref, force=force_genre)
 
-    bpm = pick_bpm(s("bpm"), features, genre)
     if intent and intent.bpm_clamp:
+        # Intent-driven flow: sample directly from the intent's clamp
+        # range. Previously we ran pick_bpm and then clamped — but
+        # pick_bpm caps at 112 globally, so high-energy intents (산책
+        # at 120 BPM target) couldn't reach their natural tempo.
+        # Using the seeded RNG keeps determinism per (seed, intent).
         lo, hi = intent.bpm_clamp
-        bpm = max(lo, min(hi, bpm))
+        bpm = lo + s("bpm_in_clamp").randint(0, hi - lo)
+    else:
+        bpm = pick_bpm(s("bpm"), features, genre)
 
-    meter = pick_meter(s("meter"), genre)
+    if intent and intent.force_meter:
+        meter = intent.force_meter
+    else:
+        meter = pick_meter(s("meter"), genre)
     motif = pick_motif(s("motif"), features,
                        avoid_ids=set(avoid_motifs or []))
 

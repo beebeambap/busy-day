@@ -132,6 +132,46 @@ def _apply_wind_density(bars, wind_factor, rng):
     return out_bars
 
 
+def _apply_activity_density(bars, activity_factor, rng):
+    """Insert stepwise passing tones into long melody notes when the
+    listener's intent implies energy (산책 / 출근길 / 활기).
+
+    `activity_factor` = (1 - features.calmness) clipped to [0, 1] AFTER
+    the intent's deltas have been applied. So:
+      sleep / dawn / nap   → activity ~ 0      → no change
+      calm / focus / warm  → activity 0.2–0.4  → no change
+      walk / commute       → activity 0.7–0.9  → ~50% of long notes split
+      lively               → similar to walk
+
+    The split takes a note of duration ≥ 0.6 beats and replaces it with
+    (note 60% dur) + (stepwise passing tone 40% dur). Same shape as
+    _apply_wind_density's dense branch — kept consistent so a windy day
+    + active intent compounds naturally without two different feels.
+    """
+    if activity_factor < 0.40:
+        return bars
+    p = min(0.85, (activity_factor - 0.30) * 1.5)
+    out_bars = []
+    for bar in bars:
+        new_bar = []
+        for i, note in enumerate(bar):
+            deg, oct_shift, dur = note
+            if dur >= 0.6 and rng.random() < p:
+                next_deg = bar[i + 1][0] if i + 1 < len(bar) else deg
+                if next_deg == deg:
+                    passing = deg + 1
+                elif next_deg > deg:
+                    passing = deg + 1
+                else:
+                    passing = deg - 1
+                new_bar.append((deg, oct_shift, dur * 0.6))
+                new_bar.append((passing, oct_shift, dur * 0.4))
+            else:
+                new_bar.append(note)
+        out_bars.append(new_bar)
+    return out_bars
+
+
 def _spread_for(warmth: float) -> str:
     """Voicing spread from normalized warmth (0..1)."""
     if warmth < 0.30:
@@ -204,6 +244,13 @@ def compose_ir(
     wind_factor = max(0.0, min(1.0,
                                float((weather or {}).get("wind_mps", 2)) / 8.0))
     melody_bars = _apply_wind_density(melody_bars, wind_factor, rng)
+
+    # Intent-driven activity boost: active intents (산책 / 출근길 /
+    # 활기) push calmness deltas negative, so activity_factor ends up
+    # high and _apply_activity_density inserts passing tones into long
+    # melody notes — the song "fills out" without losing its skeleton.
+    activity_factor = max(0.0, min(1.0, 1.0 - features.calmness))
+    melody_bars = _apply_activity_density(melody_bars, activity_factor, rng)
 
     voicing = voicing_for_genre(genre)
     melody_events = []
