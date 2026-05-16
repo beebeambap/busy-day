@@ -30,7 +30,49 @@ ABC_KEY_MAP = {
     "dorian":     "dor",
     "lydian":     "lyd",
     "mixolydian": "mix",
+    "aeolian":    "m",     # natural minor — K:Am etc.
 }
+
+# Pitch class → letter for chord symbol roots. We only use diatonic
+# keys (C/D/E/F/G/A/B) so the roots are almost always natural; sharps
+# only appear on borrowed degrees, which we accept rather than try to
+# pick the "correct" enharmonic spelling per key.
+_PC_TO_CHORD_LETTER = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+]
+
+
+def _chord_symbol(key_root: str, mode: str, degree: int,
+                  with_seventh: bool = False) -> str:
+    """Build a lead-sheet chord symbol from a scale degree.
+
+    Quality (maj/min/dim/aug) is derived from the actual mode-diatonic
+    stacking via `chord_pitches`, so it follows whatever the composer
+    actually plays (e.g. III in dorian = major, III in ionian = minor).
+    """
+    from .scales import PITCH_CLASS, chord_pitches
+    pitches = chord_pitches(key_root, mode, degree, voicing="triad")
+    root, third, fifth = pitches[0], pitches[1], pitches[2]
+    third_int = (third - root) % 12
+    fifth_int = (fifth - root) % 12
+
+    letter = _PC_TO_CHORD_LETTER[root % 12]
+    if third_int == 3 and fifth_int == 6:
+        quality = "dim"
+    elif third_int == 4 and fifth_int == 8:
+        quality = "aug"
+    elif third_int == 3:
+        quality = "m"
+    else:
+        quality = ""        # major triad
+    sym = letter + quality
+    if with_seventh:
+        # Determine 7th quality: maj7 (11), dom7 (10), m7b5 (10 over dim), etc.
+        # We keep it simple: just append "7" — readers will infer maj7 in
+        # ionian/lydian/mixolydian context. Skipping for now to keep the
+        # lead-sheet uncluttered.
+        sym += "7"
+    return sym
 
 
 def _midi_to_abc(midi: int, key_sharps: set[int]) -> str:
@@ -118,26 +160,50 @@ def ir_to_abc(ir: dict, *, title_suffix: str = "") -> str:
     for ev in ir["tracks"]["melody"]:
         bars.setdefault(ev["bar"], []).append(ev)
 
+    # Pre-compute chord symbol per bar from ir["bars"] (lead-sheet style:
+    # only emit at chord change so the score stays clean).
+    bar_meta = ir.get("bars") or []
+    chord_at_bar: dict[int, str] = {}
+    prev_sym = None
+    for idx, meta in enumerate(bar_meta):
+        deg = meta.get("chord_degree")
+        if deg is None:
+            continue
+        sym = _chord_symbol(key_root, mode, int(deg))
+        if sym != prev_sym:
+            chord_at_bar[idx] = sym
+            prev_sym = sym
+
     n_bars = ir["total_bars"]
     line_items: list[str] = []
     bars_per_line = 4
 
     for b in range(n_bars):
         events = sorted(bars.get(b, []), key=lambda e: e["start_beat"])
+        chord_prefix = f'"{chord_at_bar[b]}"' if b in chord_at_bar else ""
         if not events:
             # whole-bar rest; ABC: "z<dur>"
             rest = _abc_duration(bpb, unit_beats) or "1"
-            content = "z" + rest
+            content = chord_prefix + "z" + rest
         else:
             tokens = []
             cursor = 0.0
-            for ev in events:
+            for i, ev in enumerate(events):
                 gap = ev["start_beat"] - cursor
                 if gap > 0.05:
-                    tokens.append("z" + _abc_duration(gap, unit_beats))
+                    # Chord symbol attaches to the first token of the bar
+                    # (rest or note — both accept a "Cmaj" prefix in ABC).
+                    rest_tok = "z" + _abc_duration(gap, unit_beats)
+                    if i == 0 and chord_prefix:
+                        tokens.append(chord_prefix + rest_tok)
+                    else:
+                        tokens.append(rest_tok)
                 pitch_tok = _midi_to_abc(ev["pitch"], key_sharps)
                 dur_tok   = _abc_duration(ev["dur_beats"], unit_beats)
-                tokens.append(pitch_tok + dur_tok)
+                full = pitch_tok + dur_tok
+                if i == 0 and chord_prefix and not (gap > 0.05):
+                    full = chord_prefix + full
+                tokens.append(full)
                 cursor = ev["start_beat"] + ev["dur_beats"]
             # pad out to end of bar
             tail = bpb - cursor
