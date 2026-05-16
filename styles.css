@@ -210,9 +210,13 @@ main {
 .detail {
   position: fixed;
   inset: 0;
+  /* dvh = dynamic viewport height; collapses with iOS URL bar so
+     the modal never gets taller than the visible area. */
+  height: 100dvh;
   background: rgba(20, 18, 14, 0.32);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -220,6 +224,9 @@ main {
   z-index: 10;
   animation: fade 0.18s ease-out;
 }
+/* Lock body scroll while modal is open so touch events scroll the
+   modal, not the page underneath. */
+body.detail-open { overflow: hidden; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 .detail-inner {
@@ -627,51 +634,65 @@ main {
 }
 
 .weather {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.35rem 1rem;
-  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  font-size: 12px;
   margin: 1rem 0;
   padding: 0.75rem 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
-.weather dt { color: var(--muted); letter-spacing: 0.04em; }
-.weather dd { margin: 0; }
+.wchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  background: rgba(20, 18, 14, 0.04);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.wchip-icon { font-size: 13px; line-height: 1; opacity: 0.85; }
+.wchip-val  { color: var(--fg); letter-spacing: 0.02em; }
 
-/* ── pin bar (legendary / worst) ───────────────────────────── */
+/* ── pin buttons (legendary / worst) in detail header ──────── */
+.detail-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
 .pin-bar {
   display: flex;
-  gap: 0.5rem;
-  margin: 0.75rem 0 0;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 .pin-btn {
-  flex: 1;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0;
   border: 1px solid var(--line-2);
   background: var(--bg);
-  color: var(--muted);
-  font-size: 13px;
-  letter-spacing: 0.03em;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  opacity: 0.55;
+  transition: opacity 0.12s, background 0.12s, border-color 0.12s;
 }
-.pin-btn:hover { background: #f1ede5; color: var(--fg); }
+.pin-btn:hover { opacity: 1; background: #f1ede5; }
+.pin-btn.active { opacity: 1; }
 .pin-btn.active[data-pin="legendary"] {
   background: #fef9ec;
   border-color: #e5c84a;
-  color: #8a6d00;
 }
 .pin-btn.active[data-pin="worst"] {
   background: #fef3f0;
   border-color: #e09080;
-  color: #8a3000;
 }
-.pin-icon { font-size: 15px; line-height: 1; }
+.pin-icon { line-height: 1; }
 
 /* ── legendary badge on calendar cell ──────────────────────── */
 .cell .pin-badge {

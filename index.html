@@ -104,7 +104,17 @@
     <div class="detail-inner">
       <button id="detail-close" class="close" aria-label="닫기">✕</button>
       <header class="detail-head">
-        <h3 id="detail-date">—</h3>
+        <div class="detail-head-row">
+          <h3 id="detail-date">—</h3>
+          <div id="detail-pin" class="pin-bar">
+            <button id="pin-legendary-btn" type="button" class="pin-btn" data-pin="legendary" title="레전더리">
+              <span class="pin-icon">⭐</span>
+            </button>
+            <button id="pin-worst-btn" type="button" class="pin-btn" data-pin="worst" title="워스트">
+              <span class="pin-icon">👎</span>
+            </button>
+          </div>
+        </div>
         <p id="detail-meta" class="muted">—</p>
         <p id="detail-created" class="muted small">—</p>
         <div id="detail-variants" class="variant-chips" hidden></div>
@@ -138,7 +148,7 @@
         <p id="player-status" class="muted small">피아노 샘플 로딩 중…</p>
       </div>
 
-      <dl id="detail-weather" class="weather"></dl>
+      <div id="detail-weather" class="weather"></div>
 
       <section class="memo">
         <input id="detail-title" type="text" maxlength="80"
@@ -147,15 +157,6 @@
                   placeholder="이 곡에 대한 짧은 메모…"></textarea>
         <p id="detail-memo-status" class="muted small">—</p>
       </section>
-
-      <div id="detail-pin" class="pin-bar">
-        <button id="pin-legendary-btn" type="button" class="pin-btn" data-pin="legendary">
-          <span class="pin-icon">⭐</span> 레전더리
-        </button>
-        <button id="pin-worst-btn" type="button" class="pin-btn" data-pin="worst">
-          <span class="pin-icon">👎</span> 워스트
-        </button>
-      </div>
 
       <ul class="downloads" id="detail-downloads"></ul>
     </div>

@@ -41,13 +41,13 @@ function toMaster(node) {
 }
 
 const WEATHER_LABELS = {
-  temp_c: "기온",
-  temp_range: "일교차",
-  humidity: "습도",
-  precip_mm: "강수",
-  wind_mps: "바람",
-  cloud_pct: "운량",
-  precip_type: "강수 형태",
+  temp_c:      { label: "기온",      icon: "🌡" },
+  temp_range:  { label: "일교차",    icon: "↕" },
+  humidity:    { label: "습도",      icon: "💧" },
+  precip_mm:   { label: "강수",      icon: "🌧" },
+  wind_mps:    { label: "바람",      icon: "💨" },
+  cloud_pct:   { label: "운량",      icon: "☁" },
+  precip_type: { label: "강수 형태", icon: "•" },
 };
 
 const DOWNLOAD_KEYS = [
@@ -1150,12 +1150,17 @@ export class DetailPanel {
 
     this.root.hidden = false;
     this.root.setAttribute("aria-hidden", "false");
+    document.body.classList.add("detail-open");
+    // Reset scroll so the modal opens from the top, not wherever
+    // the previous viewing left it.
+    this.root.scrollTop = 0;
   }
 
   close() {
     this.stop();
     this.root.hidden = true;
     this.root.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("detail-open");
   }
 
   async setVariant(v) {
@@ -1498,13 +1503,19 @@ export class DetailPanel {
   renderWeather(w) {
     this.weatherEl.innerHTML = "";
     if (!w || typeof w !== "object") return;
-    for (const [k, label] of Object.entries(WEATHER_LABELS)) {
+    for (const [k, meta] of Object.entries(WEATHER_LABELS)) {
       if (!(k in w)) continue;
-      const dt = document.createElement("dt");
-      dt.textContent = label;
-      const dd = document.createElement("dd");
-      dd.textContent = fmtWeatherValue(k, w[k]);
-      this.weatherEl.append(dt, dd);
+      const chip = document.createElement("span");
+      chip.className = "wchip";
+      chip.title = meta.label;
+      const icon = document.createElement("span");
+      icon.className = "wchip-icon";
+      icon.textContent = meta.icon;
+      const val = document.createElement("span");
+      val.className = "wchip-val";
+      val.textContent = fmtWeatherValue(k, w[k]);
+      chip.append(icon, val);
+      this.weatherEl.appendChild(chip);
     }
   }
 
