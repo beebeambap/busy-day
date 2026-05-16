@@ -56,7 +56,8 @@ export class CalendarView {
     this.gridEl = gridEl;
     this.labelEl = labelEl;
     this.onDayClick = onDayClick;
-    this.filter = null;        // null = no filter; else weather category tag
+    // null = all (worst hidden); "pin_legendary" / "pin_worst"; weather tag
+    this.filter = null;
     const today = new Date();
     this.year = today.getFullYear();
     this.month = today.getMonth() + 1;
@@ -68,6 +69,26 @@ export class CalendarView {
   setFilter(tag) {
     this.filter = tag || null;
     this.render();
+  }
+
+  // Apply the active filter to a list of variants for one date cell.
+  // Returns the subset to show (may be empty).
+  _applyFilter(variants) {
+    if (!variants || !variants.length) return [];
+    if (this.filter === "pin_legendary") {
+      return variants.filter((v) => v.pin_type === "legendary");
+    }
+    if (this.filter === "pin_worst") {
+      return variants.filter((v) => v.pin_type === "worst");
+    }
+    // Default: hide worst songs, then optionally apply weather filter.
+    let result = variants.filter((v) => v.pin_type !== "worst");
+    if (this.filter) {
+      result = result.filter((v) =>
+        categorizeWeather(v.weather).has(this.filter),
+      );
+    }
+    return result;
   }
 
   async shift(delta) {
@@ -113,19 +134,23 @@ export class CalendarView {
       num.textContent = d.getDate();
       cell.appendChild(num);
 
-      let variants = songs.get(dStr);
-      if (this.filter && variants) {
-        variants = variants.filter((v) =>
-          categorizeWeather(v.weather).has(this.filter),
-        );
-      }
-      if (variants && variants.length && inMonth) {
+      const allVariants = songs.get(dStr) || [];
+      const variants = this._applyFilter(allVariants);
+
+      if (variants.length && inMonth) {
         const primary = variants[0];
         cell.classList.add("has-song");
+        if (primary.pin_type === "legendary") cell.classList.add("legendary");
         const tag = document.createElement("span");
         tag.className = "genre";
         tag.textContent = (primary.genre || "").replace(/_/g, " ");
         cell.appendChild(tag);
+        if (primary.pin_type === "legendary") {
+          const badge = document.createElement("span");
+          badge.className = "pin-badge";
+          badge.textContent = "⭐";
+          cell.appendChild(badge);
+        }
         if (variants.length > 1) {
           const c = document.createElement("span");
           c.className = "count";
@@ -135,8 +160,8 @@ export class CalendarView {
         cell.addEventListener("click", () =>
           this.onDayClick(primary, variants),
         );
-      } else if (this.filter && songs.get(dStr) && inMonth) {
-        // had songs but filter excluded them all — show as faded
+      } else if ((this.filter || allVariants.some((v) => v.pin_type === "worst")) && allVariants.length && inMonth) {
+        // had songs but filter (or default worst-hiding) excluded them all
         cell.classList.add("filtered-out");
       }
 

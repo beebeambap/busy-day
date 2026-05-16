@@ -21,7 +21,7 @@ const SONG_COLS =
   "id, city_id, date, variant_id, intent_id, instrument_id, " +
   "key_root, mode, genre, bpm, meter, duration_short_sec, " +
   "duration_long_sec, weather, paths, title, notes, " +
-  "notes_updated_at, created_at, tape_id, source_song_id";
+  "notes_updated_at, created_at, tape_id, source_song_id, pin_type";
 
 // Order so 'auto' shows first, then user variants by created_at desc.
 function _sortVariants(rows) {
@@ -123,6 +123,18 @@ export async function triggerTape({ source_song_id, tape_id }) {
   try { body = JSON.parse(text); } catch { body = { error: text }; }
   if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
   return body;          // { variant_id, eta_sec }
+}
+
+// Set or clear a song's pin. pinType: "legendary" | "worst" | null.
+export async function updateSongPin(songId, pinType) {
+  const { data, error } = await supabase
+    .from("songs")
+    .update({ pin_type: pinType ?? null })
+    .eq("id", songId)
+    .select(SONG_COLS)
+    .limit(1);
+  if (error) throw error;
+  return (data && data[0]) || null;
 }
 
 export async function recordPlay(songId, variant) {

@@ -210,19 +210,28 @@ main {
 .detail {
   position: fixed;
   inset: 0;
+  /* dvh = dynamic viewport height; collapses with iOS URL bar so
+     the modal never gets taller than the visible area. */
+  height: 100dvh;
   background: rgba(20, 18, 14, 0.32);
-  display: grid;
-  place-items: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 0;
   z-index: 10;
   animation: fade 0.18s ease-out;
 }
+/* Lock body scroll while modal is open so touch events scroll the
+   modal, not the page underneath. */
+body.detail-open { overflow: hidden; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 .detail-inner {
   background: var(--bg);
   width: min(560px, 92vw);
-  max-height: 92vh;
-  overflow: auto;
   padding: 1.75rem 1.75rem 2rem;
   position: relative;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
@@ -625,17 +634,75 @@ main {
 }
 
 .weather {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.35rem 1rem;
-  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  font-size: 12px;
   margin: 1rem 0;
   padding: 0.75rem 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
-.weather dt { color: var(--muted); letter-spacing: 0.04em; }
-.weather dd { margin: 0; }
+.wchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  background: rgba(20, 18, 14, 0.04);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.wchip-icon { font-size: 13px; line-height: 1; opacity: 0.85; }
+.wchip-val  { color: var(--fg); letter-spacing: 0.02em; }
+
+/* ── pin buttons (legendary / worst) in detail header ──────── */
+.detail-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.pin-bar {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.pin-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.12s, background 0.12s, border-color 0.12s;
+}
+.pin-btn:hover { opacity: 1; background: #f1ede5; }
+.pin-btn.active { opacity: 1; }
+.pin-btn.active[data-pin="legendary"] {
+  background: #fef9ec;
+  border-color: #e5c84a;
+}
+.pin-btn.active[data-pin="worst"] {
+  background: #fef3f0;
+  border-color: #e09080;
+}
+.pin-icon { line-height: 1; }
+
+/* ── legendary badge on calendar cell ──────────────────────── */
+.cell .pin-badge {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  font-size: 9px;
+  line-height: 1;
+}
+.cell.legendary { border-color: #e5c84a; }
 
 .downloads {
   list-style: none;
@@ -714,9 +781,9 @@ main, .calendar, .grid { max-width: 100%; min-width: 0; }
   }
 
   /* ── modals: take almost the whole screen ── */
+  .detail { padding: 2vh 0; }
   .detail-inner {
     width: 96vw;
-    max-height: 94vh;
     padding: 1.25rem 1rem 1.5rem;
   }
   .detail-head h3 { font-size: 19px; }

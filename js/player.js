@@ -1,4 +1,4 @@
-import { publicUrl, recordPlay, updateSongNotes } from "./api.js";
+import { publicUrl, recordPlay, updateSongNotes, updateSongPin } from "./api.js";
 import { matchWeatherTape, TAPE_LABELS } from "./tapes.js";
 import * as Tone from "https://esm.sh/tone@14.8.49";
 import { Midi } from "https://esm.sh/@tonejs/midi@2.0.28";
@@ -41,13 +41,13 @@ function toMaster(node) {
 }
 
 const WEATHER_LABELS = {
-  temp_c: "기온",
-  temp_range: "일교차",
-  humidity: "습도",
-  precip_mm: "강수",
-  wind_mps: "바람",
-  cloud_pct: "운량",
-  precip_type: "강수 형태",
+  temp_c:      { label: "기온",      icon: "🌡" },
+  temp_range:  { label: "일교차",    icon: "↕" },
+  humidity:    { label: "습도",      icon: "💧" },
+  precip_mm:   { label: "강수",      icon: "🌧" },
+  wind_mps:    { label: "바람",      icon: "💨" },
+  cloud_pct:   { label: "운량",      icon: "☁" },
+  precip_type: { label: "강수 형태", icon: "•" },
 };
 
 const DOWNLOAD_KEYS = [
@@ -984,7 +984,7 @@ function variantLabel(song, allVariants = null) {
 }
 
 export class DetailPanel {
-  constructor({ root, onTapeTrigger = null }) {
+  constructor({ root, onTapeTrigger = null, onPinChange = null }) {
     this.root        = root;
     this.dateEl      = root.querySelector("#detail-date");
     this.metaEl      = root.querySelector("#detail-meta");
@@ -1004,11 +1004,15 @@ export class DetailPanel {
     this.titleInput  = root.querySelector("#detail-title");
     this.notesInput  = root.querySelector("#detail-notes");
     this.memoStatus  = root.querySelector("#detail-memo-status");
+    this.pinLegendaryBtn = root.querySelector("#pin-legendary-btn");
+    this.pinWorstBtn     = root.querySelector("#pin-worst-btn");
 
     // Tape trigger lives in main.js so it can share the progress popup
     // and calendar refresh with the intent flow. We just call back when
     // the user clicks the button.
     this.onTapeTrigger = onTapeTrigger;
+    // Calendar re-render after pin change (wired in main.js).
+    this.onPinChange = onPinChange;
 
     this.midi = null;
     this.duration = 0;
@@ -1038,6 +1042,12 @@ export class DetailPanel {
     if (this.tapeBtn) {
       this.tapeBtn.addEventListener("click", () => this._onTapeClick());
     }
+    if (this.pinLegendaryBtn) {
+      this.pinLegendaryBtn.addEventListener("click", () => this._onPinClick("legendary"));
+    }
+    if (this.pinWorstBtn) {
+      this.pinWorstBtn.addEventListener("click", () => this._onPinClick("worst"));
+    }
   }
 
   // Show the "편곡하기" button when:
@@ -1061,6 +1071,30 @@ export class DetailPanel {
     this.tapeBtn.querySelector(".tape-label").textContent = "편곡하기";
     this.tapeBtn.querySelector(".tape-sub").textContent = `${meta.label} 톤`;
     this.tapeActionEl.hidden = false;
+  }
+
+  _renderPin(song) {
+    if (!this.pinLegendaryBtn || !this.pinWorstBtn) return;
+    const pt = song?.pin_type || null;
+    this.pinLegendaryBtn.classList.toggle("active", pt === "legendary");
+    this.pinWorstBtn.classList.toggle("active", pt === "worst");
+  }
+
+  async _onPinClick(pinType) {
+    if (!this.song) return;
+    // Toggle: clicking active pin clears it
+    const next = this.song.pin_type === pinType ? null : pinType;
+    const songId = this.song.id;
+    try {
+      const updated = await updateSongPin(songId, next);
+      if (this.song && this.song.id === songId && updated) {
+        this.song.pin_type = updated.pin_type;
+        this._renderPin(this.song);
+      }
+      if (this.onPinChange) this.onPinChange();
+    } catch (err) {
+      console.error("[pin] save failed:", err);
+    }
   }
 
   async _onTapeClick() {
@@ -1090,6 +1124,7 @@ export class DetailPanel {
     this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
     this.renderVariantChips();
     this._renderTapeAction(song);
+    this._renderPin(song);
     this.renderMemo(song);
 
     const svgUrl = publicUrl(song.paths?.svg);
@@ -1115,12 +1150,17 @@ export class DetailPanel {
 
     this.root.hidden = false;
     this.root.setAttribute("aria-hidden", "false");
+    document.body.classList.add("detail-open");
+    // Reset scroll so the modal opens from the top, not wherever
+    // the previous viewing left it.
+    this.root.scrollTop = 0;
   }
 
   close() {
     this.stop();
     this.root.hidden = true;
     this.root.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("detail-open");
   }
 
   async setVariant(v) {
@@ -1463,13 +1503,19 @@ export class DetailPanel {
   renderWeather(w) {
     this.weatherEl.innerHTML = "";
     if (!w || typeof w !== "object") return;
-    for (const [k, label] of Object.entries(WEATHER_LABELS)) {
+    for (const [k, meta] of Object.entries(WEATHER_LABELS)) {
       if (!(k in w)) continue;
-      const dt = document.createElement("dt");
-      dt.textContent = label;
-      const dd = document.createElement("dd");
-      dd.textContent = fmtWeatherValue(k, w[k]);
-      this.weatherEl.append(dt, dd);
+      const chip = document.createElement("span");
+      chip.className = "wchip";
+      chip.title = meta.label;
+      const icon = document.createElement("span");
+      icon.className = "wchip-icon";
+      icon.textContent = meta.icon;
+      const val = document.createElement("span");
+      val.className = "wchip-val";
+      val.textContent = fmtWeatherValue(k, w[k]);
+      chip.append(icon, val);
+      this.weatherEl.appendChild(chip);
     }
   }
 
