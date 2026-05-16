@@ -211,8 +211,12 @@ main {
   position: fixed;
   inset: 0;
   background: rgba(20, 18, 14, 0.32);
-  display: grid;
-  place-items: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 0;
   z-index: 10;
   animation: fade 0.18s ease-out;
 }
@@ -221,8 +225,6 @@ main {
 .detail-inner {
   background: var(--bg);
   width: min(560px, 92vw);
-  max-height: 92vh;
-  overflow: auto;
   padding: 1.75rem 1.75rem 2rem;
   position: relative;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
@@ -758,9 +760,9 @@ main, .calendar, .grid { max-width: 100%; min-width: 0; }
   }
 
   /* ── modals: take almost the whole screen ── */
+  .detail { padding: 2vh 0; }
   .detail-inner {
     width: 96vw;
-    max-height: 94vh;
     padding: 1.25rem 1rem 1.5rem;
   }
   .detail-head h3 { font-size: 19px; }
