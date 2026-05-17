@@ -98,10 +98,20 @@ function makeRhodes(volume) {
 }
 
 function makeNylon(volume) {
-  return new Tone.PolySynth(Tone.PluckSynth, {
-    attackNoise: 0.6,
-    dampening:   4200,
-    resonance:   0.96,
+  // PluckSynth isn't Monophonic in Tone.js v14, so it can't go inside
+  // PolySynth (throws "Voice must extend Monophonic"). MonoSynth gives
+  // us a polyphony-friendly pluck: triangle wave + sharp filter sweep
+  // from bright to mellow + decay-to-silence envelope.
+  return new Tone.PolySynth(Tone.MonoSynth, {
+    oscillator: { type: "triangle" },
+    envelope: {
+      attack: 0.005, decay: 0.55, sustain: 0.0, release: 1.1,
+    },
+    filterEnvelope: {
+      attack: 0.001, decay: 0.18, sustain: 0.0, release: 0.5,
+      baseFrequency: 1200, octaves: 2.2,
+    },
+    filter: { Q: 1, type: "lowpass", rolloff: -24 },
     volume,
   });
 }
@@ -253,15 +263,22 @@ function makeTinWhistle(volume) {
 }
 
 function makeHarp(volume) {
-  // Celtic harp: PluckSynth with softer attack noise and lighter
-  // dampening so notes ring out long, like a concert harp.
-  const synth = new Tone.PolySynth(Tone.PluckSynth, {
-    attackNoise: 0.30,
-    dampening:   3400,
-    resonance:   0.98,
+  // Celtic harp: same PluckSynth/PolySynth incompatibility issue as
+  // makeNylon. MonoSynth-based pluck with longer ring-out (decay 1.0,
+  // release 2.4) and a darker filter baseline so the harp sits softer
+  // than the nylon guitar.
+  return new Tone.PolySynth(Tone.MonoSynth, {
+    oscillator: { type: "triangle" },
+    envelope: {
+      attack: 0.003, decay: 1.0, sustain: 0.0, release: 2.4,
+    },
+    filterEnvelope: {
+      attack: 0.001, decay: 0.3, sustain: 0.0, release: 1.0,
+      baseFrequency: 800, octaves: 3.0,
+    },
+    filter: { Q: 1, type: "lowpass", rolloff: -24 },
+    volume,
   });
-  synth.volume.value = volume;
-  return synth;
 }
 
 // instrument_id (user override) -> factory(reverbBus) returning the
