@@ -38,6 +38,32 @@ def pick_sub_style(rng: Random, genre: str) -> str | None:
     return rng.choice(options)
 
 
+# ── octave register (weather-driven, probabilistic) ──────────────
+# Per-song decisions that govern melody register. Probabilistic on
+# purpose so a cold week doesn't end up with 7 identical-octave songs.
+
+def pick_melody_octave(rng: Random, f) -> int:
+    """Macro register decision: 4 (alto-ish) or 5 (current default).
+    Probabilistic — even a very cold day stays at 5 ~30% of the time, so
+    repeated similar-weather days still produce a mix of registers.
+    Higher octave (6) is reserved for in-song climbs, not macro selection
+    (oct 6 melody across a whole song sounds shrill on most instruments).
+    """
+    p_low = 0.15 + 0.40 * (1.0 - f.warmth)   # cold → oct 4 more likely
+    return 4 if rng.random() < p_low else 5
+
+
+def pick_oct_climb(rng: Random, f, intent_id: str | None) -> bool:
+    """Per-song decision: does THIS song use B-section +1 oct climbs?
+    Brightness drives base probability; active intents (walk / lively /
+    commute) boost it. Decided once per song — the actual bar-level
+    firing is gated by a separate RNG roll inside the bar loop."""
+    p = 0.20 + 0.35 * f.brightness
+    if intent_id in ("walk", "lively", "commute"):
+        p *= 1.4
+    return rng.random() < p
+
+
 def _weighted_choice(rng: Random, items: list, weights: list[float]) -> Any:
     total = sum(weights)
     r = rng.random() * total
