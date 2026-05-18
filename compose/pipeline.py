@@ -16,6 +16,7 @@ from .mapping import (
     pick_meter,
     pick_mode,
     pick_motif,
+    pick_sub_style,
 )
 from .seed import make_seed, rng
 
@@ -68,9 +69,12 @@ def _decide_spec(
     motif = pick_motif(s("motif"), features,
                        avoid_ids=set(avoid_motifs or []))
 
+    sub_style = pick_sub_style(s("sub_style"), genre)
+
     return {
         "key_root": key, "mode": mode, "genre": genre,
         "bpm": bpm, "meter": meter, "motif": motif,
+        "sub_style": sub_style,
         "intent_id": intent.id if intent else None,
     }
 

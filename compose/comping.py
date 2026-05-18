@@ -663,19 +663,41 @@ def _maybe_drop_last(events, rng: Random, p: float = 0.12):
 
 
 def harmony_pattern_for(genre: str, meter: str,
-                        section: str, rng: Random):
+                        section: str, rng: Random,
+                        sub_style: str | None = None):
     bpb = int(meter.split("/")[0])
-    h, _ = _table(bpb)
-    cells = h.get(genre, h["ambient"])
+    cells = _resolve_cells("harmony", genre, sub_style, bpb)
     return _maybe_drop_last(_pick_cell(cells, section, rng), rng)
 
 
 def bass_pattern_for(genre: str, meter: str,
-                     section: str, rng: Random):
+                     section: str, rng: Random,
+                     sub_style: str | None = None):
     bpb = int(meter.split("/")[0])
-    _, b = _table(bpb)
-    cells = b.get(genre, b["ambient"])
+    cells = _resolve_cells("bass", genre, sub_style, bpb)
     return _maybe_drop_last(_pick_cell(cells, section, rng), rng, p=0.08)
+
+
+def _resolve_cells(layer: str, genre: str, sub_style: str | None,
+                   bpb: int) -> list:
+    """Return the cell list for (layer, genre, sub_style, bpb).
+
+    Looks up sub-style-specific pack first (4/4 only — sub-styles aren't
+    defined for 3/4 / 6/8 yet). Falls back to the genre-only table when
+    sub_style is None or no pack exists for this combo.
+    """
+    if sub_style and bpb == 4:
+        sub_table = _SUB_PACKS.get(layer)
+        if sub_table is not None:
+            pack = sub_table.get((genre, sub_style))
+            if pack:
+                return pack
+    h, b = _table(bpb)
+    if layer == "harmony":
+        return h.get(genre, h["ambient"])
+    if layer == "bass":
+        return b.get(genre, b["ambient"])
+    raise ValueError(layer)
 
 
 # Backward-compat: callers without rng/section get the canonical cell.
@@ -1007,8 +1029,13 @@ _PFILL_68 = {
 
 
 def percussion_pattern_for(genre: str, meter: str,
-                           section: str, rng: Random):
+                           section: str, rng: Random,
+                           sub_style: str | None = None):
     bpb = int(meter.split("/")[0])
+    if sub_style and bpb == 4:
+        sub_pack = _SUB_PACKS.get("percussion", {}).get((genre, sub_style))
+        if sub_pack:
+            return _pick_cell(sub_pack, section, rng)
     table = {3: _P34, 4: _P44, 6: _P68}.get(bpb, _P44)
     cells = table.get(genre, [[]])
     return _pick_cell(cells, section, rng)
@@ -1044,4 +1071,238 @@ GM_DRUM_NOTE = {
     "kick":   36,
     "snare":  38,
     "hat":    42,
+}
+
+
+# ── sub-style cell packs (4/4 only) ────────────────────────────────
+# Each genre's sub-styles override the genre default with a curated
+# cell list. "basica/walking/boom_chick" stay close to the genre's
+# signature; the alternate sub-style steers the song into a clearly
+# different feel (jazz comping, Celtic drone, rubato ballad).
+
+# bossa_nova → básica (classic): keep the dotted-quarter 1.5+0.5 bass
+# and anticipated chord — the bossa signature.
+_BOSSA_BASICA_H = [
+    [(0.0,  0.5, "root",   0.95),
+     (0.75, 1.0, "top",    0.92),
+     (2.0,  0.5, "fifth",  0.85),
+     (2.5,  0.5, "top",    0.92),
+     (3.0,  1.0, "top",    0.90)],
+    [(0.0,  0.75, "root",  0.95),
+     (0.75, 1.25, "top",   0.92),
+     (2.5,  0.5, "fifth",  0.88),
+     (3.0,  0.5, "top",    0.90),
+     (3.5,  0.5, "top",    0.85)],
+    # esparso (partido-alto): 2 hits, breathing room
+    [(0.0,  1.5, "all",    0.95),
+     (2.5,  1.5, "top",    0.88)],
+]
+_BOSSA_BASICA_B = [
+    [(0.0, 1.5, "root"), (1.5, 0.5, "fifth"),
+     (2.0, 1.5, "fifth"), (3.5, 0.5, "root")],
+    [(0.0, 1.5, "root"), (1.5, 0.5, "third"),
+     (2.0, 1.5, "fifth"), (3.5, 0.5, "fifth_up")],
+    # tumbao
+    [(0.0, 2.5, "root"), (2.5, 1.0, "fifth"), (3.5, 0.5, "root")],
+]
+_BOSSA_BASICA_P = [
+    [(0.0, "shaker", 0.55), (0.5, "shaker", 0.40),
+     (1.0, "shaker", 0.55), (1.5, "shaker", 0.40),
+     (2.0, "shaker", 0.55), (2.5, "shaker", 0.40),
+     (3.0, "shaker", 0.55), (3.5, "shaker", 0.40)],
+    [(0.0, "tap",    0.55),
+     (0.5, "shaker", 0.35), (1.0, "shaker", 0.45),
+     (1.5, "shaker", 0.35),
+     (2.0, "tap",    0.50),
+     (2.5, "shaker", 0.35), (3.0, "shaker", 0.45),
+     (3.5, "shaker", 0.35)],
+]
+
+# bossa_nova → jazz (Jobim later years): longer stabs, walking bass,
+# brush back-beat. Closer to jazz_ballad than to básica.
+_BOSSA_JAZZ_H = [
+    # long stab + short reply + long stab (like jazz_ballad canonical)
+    [(0.0, 1.5, "all",  0.90),
+     (1.5, 0.5, "top",  0.78),
+     (2.0, 2.0, "top3", 0.88)],
+    # anticipation but with held 7th
+    [(0.0,  0.5, "root", 0.92),
+     (0.75, 1.25, "top3", 0.90),
+     (2.5,  1.5, "top3", 0.85)],
+    # full rubato
+    [(0.0, 4.0, "top3", 0.88)],
+]
+_BOSSA_JAZZ_B = [
+    # walking quarters 1-3-5-3
+    [(0.0, 1.0, "root"), (1.0, 1.0, "third"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "third")],
+    # chromatic feel
+    [(0.0, 1.0, "root"), (1.0, 1.0, "third"),
+     (2.0, 1.0, "fifth_up"), (3.0, 1.0, "fifth")],
+    # half-note (2-feel)
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],
+]
+_BOSSA_JAZZ_P = [
+    # brush back-beat (no shaker)
+    [(1.0, "brush", 0.55), (3.0, "brush", 0.55)],
+    [(0.0, "ride", 0.40), (1.0, "brush", 0.55),
+     (2.0, "ride", 0.40), (3.0, "brush", 0.55)],
+    # light shaker + brush hybrid (subtle bridge to básica)
+    [(0.0, "shaker", 0.35), (1.0, "brush", 0.50),
+     (2.0, "shaker", 0.30), (3.0, "brush", 0.50)],
+]
+
+# folk → boom_chick (current default): root+fifth alternation, brush
+# back-beat.
+_FOLK_BOOMCHICK_H = [
+    [(0.0, 1.0, "root_5", 0.95), (1.0, 1.0, "top", 0.90),
+     (2.0, 1.0, "root_5", 0.90), (3.0, 1.0, "top", 0.88)],
+    [(0.0, 1.0, "root_5", 0.95),
+     (1.0, 0.5, "top", 0.88), (1.5, 0.5, "top", 0.82),
+     (2.0, 1.0, "root_5", 0.92),
+     (3.0, 0.5, "top", 0.88), (3.5, 0.5, "top", 0.82)],
+]
+_FOLK_BOOMCHICK_B = [
+    [(0.0, 1.0, "root"), (1.0, 1.0, "fifth"),
+     (2.0, 1.0, "root"), (3.0, 1.0, "fifth")],
+    [(0.0, 1.0, "root"), (1.0, 1.0, "fifth"),
+     (2.0, 1.0, "third"), (3.0, 1.0, "fifth_up")],
+    [(0.0, 0.5, "root"), (0.5, 0.5, "fifth"),
+     (1.0, 0.5, "root"), (1.5, 0.5, "third"),
+     (2.0, 0.5, "root"), (2.5, 0.5, "fifth"),
+     (3.0, 0.5, "fifth"), (3.5, 0.5, "fifth_up")],
+]
+_FOLK_BOOMCHICK_P = [
+    [(0.0, "tap", 0.50), (1.0, "brush", 0.65),
+     (2.0, "tap", 0.45), (3.0, "brush", 0.65)],
+    [(0.0, "tap", 0.50),
+     (1.0, "brush", 0.65), (1.5, "brush", 0.45),
+     (2.0, "tap", 0.45),
+     (3.0, "brush", 0.65), (3.5, "brush", 0.45)],
+    # folk-stomp
+    [(0.0, "kick", 0.65), (1.0, "snare", 0.55),
+     (2.0, "kick", 0.62), (3.0, "snare", 0.55)],
+]
+
+# folk → celtic (drone-heavy, Muji-Celtic core): held open-fifth
+# voicings, drone bass, very sparse percussion. Pairs naturally with
+# open_fifth voicing (already selected by arrange.py for folk INTRO/A).
+_FOLK_CELTIC_H = [
+    # drone — open fifth held all 4 beats
+    [(0.0, 4.0, "root_5", 0.92)],
+    # drone with single answer chord on beat 3
+    [(0.0, 3.0, "root_5", 0.95), (3.0, 1.0, "top", 0.80)],
+    # lilting pickup (existing folk alt 3)
+    [(0.5, 0.5, "root_5", 0.85),
+     (1.0, 1.5, "top",    0.92),
+     (2.5, 1.5, "root_5", 0.88)],
+]
+_FOLK_CELTIC_B = [
+    # full-bar root drone
+    [(0.0, 4.0, "root")],
+    # root + fifth half-bar pedal
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],
+    # stepwise 1-3-5-1
+    [(0.0, 1.0, "root"), (1.0, 1.0, "third"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "root")],
+]
+_FOLK_CELTIC_P = [
+    # very sparse — single tap on 1
+    [(0.0, "tap", 0.45)],
+    [(0.0, "tap", 0.45), (2.0, "brush", 0.32)],
+    # all-brush wash (no strong beats)
+    [(0.0, "brush", 0.38), (1.0, "brush", 0.32),
+     (2.0, "brush", 0.38), (3.0, "brush", 0.32)],
+]
+
+# jazz_ballad → walking (current default): walking quarter bass,
+# ride+brush.
+_JAZZ_WALKING_H = [
+    [(0.0, 2.0, "top3", 0.90),
+     (2.0, 0.5, "top",  0.80),
+     (2.5, 1.5, "top3", 0.88)],
+    [(0.0, 1.0, "top3", 0.90),
+     (1.5, 0.5, "top",  0.80),
+     (2.0, 1.0, "top3", 0.85),
+     (3.5, 0.5, "top",  0.82)],
+    [(0.0, 2.0, "top3", 0.90),
+     (2.0, 2.0, "top3", 0.85)],
+]
+_JAZZ_WALKING_B = [
+    [(0.0, 1.0, "root"), (1.0, 1.0, "third"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "third")],
+    [(0.0, 1.0, "root"), (1.0, 1.0, "fifth_up"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "third")],
+    # bebop straight-8ths
+    [(0.0, 0.5, "root"), (0.5, 0.5, "third"),
+     (1.0, 0.5, "fifth"), (1.5, 0.5, "fifth_up"),
+     (2.0, 0.5, "fifth"), (2.5, 0.5, "third"),
+     (3.0, 0.5, "fifth"), (3.5, 0.5, "fifth_up")],
+]
+_JAZZ_WALKING_P = [
+    [(0.0, "ride", 0.40), (1.0, "brush", 0.55),
+     (1.5, "ride", 0.30), (2.0, "ride", 0.40),
+     (2.5, "ride", 0.30), (3.0, "brush", 0.55),
+     (3.5, "ride", 0.30)],
+    [(0.0, "brush", 0.45), (1.0, "brush", 0.55),
+     (2.0, "brush", 0.45), (3.0, "brush", 0.55)],
+]
+
+# jazz_ballad → rubato (Bill Evans solo feel): whole-note chords,
+# half-note bass, minimal percussion. Almost free time.
+_JAZZ_RUBATO_H = [
+    # whole-bar single chord — the "Bill Evans pause"
+    [(0.0, 4.0, "top3", 0.88)],
+    # 3-beat held + 1-beat answer
+    [(0.0, 3.0, "top3", 0.88), (3.0, 1.0, "top", 0.78)],
+    # two breathing stabs
+    [(0.0, 2.0, "top3", 0.90), (2.0, 2.0, "top3", 0.85)],
+]
+_JAZZ_RUBATO_B = [
+    # half-note root+fifth
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],
+    # whole-bar root pedal
+    [(0.0, 4.0, "root")],
+    # pedal-then-walk (Bill Evans trio)
+    [(0.0, 2.0, "root"), (2.0, 1.0, "fifth"), (3.0, 1.0, "third")],
+]
+_JAZZ_RUBATO_P = [
+    # single brush on beat 1
+    [(0.0, "brush", 0.40)],
+    # brush on 1 and 3
+    [(0.0, "brush", 0.40), (2.0, "brush", 0.35)],
+    # ride on 2&4 only (super spacious)
+    [(1.0, "ride", 0.40), (3.0, "ride", 0.40)],
+]
+
+
+# Registry mapping (layer, genre, sub_style) → cell pack. Lookup is
+# 4/4 only — sub-styles aren't defined for 3/4 / 6/8 yet (those meters
+# are mostly folk and the celtic sub-style there isn't strongly distinct
+# from boom_chick in 3 beats).
+_SUB_PACKS = {
+    "harmony": {
+        ("bossa_nova",  "basica"):     _BOSSA_BASICA_H,
+        ("bossa_nova",  "jazz"):       _BOSSA_JAZZ_H,
+        ("folk",        "boom_chick"): _FOLK_BOOMCHICK_H,
+        ("folk",        "celtic"):     _FOLK_CELTIC_H,
+        ("jazz_ballad", "walking"):    _JAZZ_WALKING_H,
+        ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_H,
+    },
+    "bass": {
+        ("bossa_nova",  "basica"):     _BOSSA_BASICA_B,
+        ("bossa_nova",  "jazz"):       _BOSSA_JAZZ_B,
+        ("folk",        "boom_chick"): _FOLK_BOOMCHICK_B,
+        ("folk",        "celtic"):     _FOLK_CELTIC_B,
+        ("jazz_ballad", "walking"):    _JAZZ_WALKING_B,
+        ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_B,
+    },
+    "percussion": {
+        ("bossa_nova",  "basica"):     _BOSSA_BASICA_P,
+        ("bossa_nova",  "jazz"):       _BOSSA_JAZZ_P,
+        ("folk",        "boom_chick"): _FOLK_BOOMCHICK_P,
+        ("folk",        "celtic"):     _FOLK_CELTIC_P,
+        ("jazz_ballad", "walking"):    _JAZZ_WALKING_P,
+        ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_P,
+    },
 }

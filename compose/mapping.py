@@ -20,6 +20,23 @@ MODES = ["ionian", "dorian", "lydian", "mixolydian", "aeolian"]
 GENRES = ["ambient", "bossa_nova", "jazz_ballad", "lo_fi", "neo_classical", "folk"]
 METERS = ["3/4", "4/4", "6/8"]
 
+# Sub-styles — each genre splits into 2 "personalities" picked once per
+# song (seeded RNG). Picker functions in comping.py use sub-style-
+# specific cell packs when defined; otherwise fall back to genre default.
+# None = no sub-style (tape transforms; genres without packs yet).
+SUB_STYLES: dict[str, list[str]] = {
+    "bossa_nova":  ["basica", "jazz"],
+    "folk":        ["boom_chick", "celtic"],
+    "jazz_ballad": ["walking", "rubato"],
+}
+
+
+def pick_sub_style(rng: Random, genre: str) -> str | None:
+    options = SUB_STYLES.get(genre)
+    if not options:
+        return None
+    return rng.choice(options)
+
 
 def _weighted_choice(rng: Random, items: list, weights: list[float]) -> Any:
     total = sum(weights)
