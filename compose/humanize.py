@@ -85,13 +85,24 @@ def apply_micro_timing(
     *,
     jitter_beats: float = 0.018,
 ) -> list[dict]:
-    """Nudge note onsets by ±jitter_beats (independent per note)."""
+    """Nudge note onsets by ±jitter_beats.
+
+    Events that share the same (bar, start_beat) cluster get the SAME
+    jitter offset, so a melody note and its harmony partner — both at
+    e.g. bar=3, start_beat=2.0 — move together instead of drifting
+    apart by up to 2*jitter_beats (= ~27 ms at 80 BPM, audible flam).
+    """
+    cluster_jitter: dict[tuple, float] = {}
     for ev in events:
-        if "start_beat" in ev:
-            ev["start_beat"] = round(
-                max(0.0, ev["start_beat"] + (rng.random() - 0.5) * 2 * jitter_beats),
-                4,
-            )
+        if "start_beat" not in ev:
+            continue
+        key = (ev.get("bar"), ev["start_beat"])
+        if key not in cluster_jitter:
+            cluster_jitter[key] = (rng.random() - 0.5) * 2 * jitter_beats
+        ev["start_beat"] = round(
+            max(0.0, ev["start_beat"] + cluster_jitter[key]),
+            4,
+        )
     return events
 
 
