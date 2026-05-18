@@ -244,7 +244,9 @@ def compose_ir(
     drone_on = cloud_pct >= 70.0  # cloudy day → fog-drone
     drone_events: list[dict] = []
     motif = spec["motif"]
-    sub_style = spec.get("sub_style")  # None if genre has no sub-styles
+    sub_style = spec.get("sub_style")
+    melody_octave = int(spec.get("melody_octave", 5))
+    oct_climb_in_song = bool(spec.get("oct_climb", False))
     bpb = _beats_per_bar(meter)
 
     sec_len = _section_lengths(genre, bpm, bpb, target_sec=target_sec)
@@ -335,9 +337,19 @@ def compose_ir(
             # first-note path and the probabilistic later-notes path.
             harm_mult = _GENRE_HARMONIZE_MULTIPLIER.get(genre, 1.0)
             extra_harmonize_p = (0.20 + activity_factor * 0.35) * harm_mult
+            # Per-bar octave lift for B-section climbs (35% chance per
+            # B bar IF this song was flagged for climbs at spec time).
+            # Bass/chord stay put — only the melody (and its harmony
+            # partner) rises, so the listener hears "the line reaching".
+            bar_oct_lift = 0
+            if oct_climb_in_song and section == "B" and rng.random() < 0.35:
+                bar_oct_lift = 1
             for note_idx, (deg, oct_shift, dur) in enumerate(mel_notes):
-                pitch = degree_to_midi(key, mode, deg, octave_shift=oct_shift,
-                                       base_octave=5)
+                pitch = degree_to_midi(
+                    key, mode, deg,
+                    octave_shift=oct_shift + bar_oct_lift,
+                    base_octave=melody_octave,
+                )
                 if 36 <= pitch <= 96:
                     vel = 70 + int(rng.uniform(-6, 6))
                     if section == "OUTRO":
@@ -612,6 +624,8 @@ def compose_ir(
             "motif_id": motif["id"],
             "voicing": voicing,
             "sub_style": sub_style,
+            "melody_octave": melody_octave,
+            "oct_climb": oct_climb_in_song,
         },
         "features": features.as_dict(),
         "form": form,
