@@ -181,15 +181,45 @@ def _spread_for(warmth: float) -> str:
     return "default"
 
 
-def _third_below_diatonic(deg: int, oct_shift: int) -> tuple[int, int]:
-    """Return (degree, octave_shift) for the diatonic third below the
-    given scale-degree. Handles octave wrap when deg-2 would dip below
-    the first scale degree (e.g. tonic → 6th in the octave below)."""
-    h = deg - 2
-    while h < 1:
-        h += 7
-        oct_shift -= 1
-    return h, oct_shift
+def _harmony_below_chord(melody_pitch: int, chord_pcs: set[int],
+                         *, min_dist: int = 3, max_dist: int = 10) -> int | None:
+    """Find the closest chord-tone pitch below the melody.
+
+    Replaces the old pure-diatonic _third_below_diatonic. Searches
+    downward from min_dist..max_dist semitones for a pitch whose pitch
+    class is in `chord_pcs` (the current bar's chord). This guarantees
+    the right-hand harmony note belongs to the active chord, avoiding
+    the b9/avoid-note clashes that pure parallel-thirds produce.
+
+    `min_dist=3` keeps the harmony from sounding like a doubling
+    (anything < m3 reads as unison/2nd, not a chord interval).
+    `max_dist=10` (minor 7th) caps the gap so we don't drop the
+    harmony into bass register.
+    """
+    for offset in range(min_dist, max_dist + 1):
+        candidate = melody_pitch - offset
+        if (candidate % 12) in chord_pcs:
+            return candidate
+    return None
+
+
+# Genre-aware right-hand harmonization rate. Multiplier on both the
+# "first note of bar" and "subsequent note" probabilities.
+# - ambient:      no harmonization (pad-only texture; parallel thirds
+#                 would muddy the wash).
+# - neo_classical/folk: full — these idioms use parallel thirds heavily.
+# - bossa_nova/jazz_ballad: very light — the melody is conventionally a
+#                 single line in these genres; left-hand voicings already
+#                 carry the harmony.
+# - lo_fi:        medium — some harmonization adds warmth.
+_GENRE_HARMONIZE_MULTIPLIER = {
+    "ambient":       0.0,
+    "neo_classical": 1.0,
+    "folk":          0.9,
+    "bossa_nova":    0.20,
+    "jazz_ballad":   0.25,
+    "lo_fi":         0.45,
+}
 
 
 def compose_ir(
@@ -288,13 +318,21 @@ def compose_ir(
 
         if play_melody:
             t = 0.0
-            # Probability that a non-downbeat melody note picks up a
-            # parallel third below. The bar's first note is ALWAYS
-            # harmonized (when long enough) so the listener gets a
-            # reliable "chord on every downbeat" feel; the rest scale
-            # with activity so calm songs stay sparse and active songs
-            # ring as full two-voice piano.
-            extra_harmonize_p = 0.20 + activity_factor * 0.35
+            # Chord-tone source for right-hand harmonization. We use
+            # "seventh" voicing (4 chord tones) regardless of the
+            # left-hand's bar_voicing, so the right hand has enough
+            # candidates to find a close chord tone below most melody
+            # notes. PCs only — actual octave is picked by the search.
+            harm_chord_pcs = {
+                p % 12 for p in chord_pitches(
+                    key, mode, chord_root,
+                    voicing="seventh", base_octave=3,
+                )
+            }
+            # Genre-aware harmonization rate. Scales both the always-on
+            # first-note path and the probabilistic later-notes path.
+            harm_mult = _GENRE_HARMONIZE_MULTIPLIER.get(genre, 1.0)
+            extra_harmonize_p = (0.20 + activity_factor * 0.35) * harm_mult
             for note_idx, (deg, oct_shift, dur) in enumerate(mel_notes):
                 pitch = degree_to_midi(key, mode, deg, octave_shift=oct_shift,
                                        base_octave=5)
@@ -310,29 +348,25 @@ def compose_ir(
                         "vel": vel,
                     })
 
-                    # Right-hand harmonization (parallel third below).
-                    # Two paths:
-                    #   - bar's first note + dur ≥ 0.35  → always
-                    #   - any other note  + dur ≥ 0.35   → probabilistic
-                    # The 0.35 threshold lets us catch notes that have
-                    # been shortened by _apply_activity_density (a 1.0
-                    # original note splits into 0.6 + 0.4).
+                    # Right-hand harmonization (chord-tone below melody).
+                    #   - bar's first note + dur ≥ 0.35  → rng vs harm_mult
+                    #   - any other note  + dur ≥ 0.35   → rng vs extra_p
+                    # The 0.35 threshold catches notes shortened by
+                    # _apply_activity_density (a 1.0 split into 0.6+0.4).
+                    # Both paths are gated by harm_mult — ambient (=0)
+                    # never harmonizes, bossa/jazz harmonize sparsely.
                     should_harmonize = False
-                    if dur >= 0.35:
+                    if dur >= 0.35 and harm_mult > 0:
                         if note_idx == 0:
-                            should_harmonize = True
-                        elif rng.random() < extra_harmonize_p:
-                            should_harmonize = True
+                            should_harmonize = rng.random() < harm_mult
+                        else:
+                            should_harmonize = rng.random() < extra_harmonize_p
 
                     if should_harmonize:
-                        h_deg, h_oct = _third_below_diatonic(deg, oct_shift)
-                        h_pitch = degree_to_midi(
-                            key, mode, h_deg,
-                            octave_shift=h_oct, base_octave=5,
-                        )
-                        # Stay below the melody note and above the bass
-                        # (MIDI 48 = C3) so the texture doesn't muddy.
-                        if 48 <= h_pitch < pitch:
+                        h_pitch = _harmony_below_chord(pitch, harm_chord_pcs)
+                        # Stay above the bass (MIDI 48 = C3) so the
+                        # texture doesn't muddy.
+                        if h_pitch is not None and 48 <= h_pitch < pitch:
                             h_vel = max(35, vel - 12)
                             melody_events.append({
                                 "bar": cur_bar,
