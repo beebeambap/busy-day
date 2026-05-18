@@ -140,12 +140,17 @@ export class CalendarView {
       if (variants.length && inMonth) {
         const primary = variants[0];
         cell.classList.add("has-song");
+        // ⭐ badge fires when ANY variant of the day is legendary —
+        // user might pin a non-primary variant (e.g., a tape) and still
+        // want the day flagged. Border highlight reserved for when the
+        // PRIMARY variant is legendary (stronger signal).
+        const anyLegendary = variants.some((v) => v.pin_type === "legendary");
         if (primary.pin_type === "legendary") cell.classList.add("legendary");
         const tag = document.createElement("span");
         tag.className = "genre";
         tag.textContent = (primary.genre || "").replace(/_/g, " ");
         cell.appendChild(tag);
-        if (primary.pin_type === "legendary") {
+        if (anyLegendary) {
           const badge = document.createElement("span");
           badge.className = "pin-badge";
           badge.textContent = "⭐";

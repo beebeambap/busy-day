@@ -1108,6 +1108,14 @@ export class DetailPanel {
         this.song.pin_type = updated.pin_type;
         this._renderPin(this.song);
       }
+      // Mirror the pin into the in-memory variants list so the
+      // variant-chip badges update immediately (without a refetch).
+      if (this.variants) {
+        for (const v of this.variants) {
+          if (v.id === songId) v.pin_type = updated?.pin_type ?? next;
+        }
+      }
+      this.renderVariantChips();
       if (this.onPinChange) this.onPinChange();
     } catch (err) {
       console.error("[pin] save failed:", err);
@@ -1378,6 +1386,16 @@ export class DetailPanel {
         labelSpan.textContent = variantLabel(v, this.variants);
         b.appendChild(labelSpan);
 
+        // Pin badge — small ⭐/👎 next to the label so the listener
+        // can see at a glance which variant carries the user's pin.
+        if (v.pin_type === "legendary" || v.pin_type === "worst") {
+          const pinBadge = document.createElement("span");
+          pinBadge.className = `chip-pin chip-pin-${v.pin_type}`;
+          pinBadge.textContent = v.pin_type === "legendary" ? "⭐" : "👎";
+          pinBadge.title = v.pin_type === "legendary" ? "레전더리" : "워스트";
+          b.appendChild(pinBadge);
+        }
+
         // For originals: append small icon badges for each tape that
         // was derived from this song. Lets the listener scan one row
         // and see "this 산책 has 🌧 and 🌞 versions" at a glance.
@@ -1445,6 +1463,7 @@ export class DetailPanel {
     this.metaEl.textContent = fmtMeta(song);
     this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
     this._renderTapeAction(song);
+    this._renderPin(song);
     this.renderMemo(song);
 
     const svgUrl = publicUrl(song.paths?.svg);
