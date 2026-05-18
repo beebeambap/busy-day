@@ -26,6 +26,7 @@ from .comping import (
     bass_pitch as _bass_pitch,
     chord_subset,
     harmony_pattern_for,
+    percussion_fill_for,
     percussion_pattern_for,
 )
 from .features import Features
@@ -470,10 +471,25 @@ def compose_ir(
         # ── percussion: defines the pulse so the listener can feel
         #    time even when chord changes are slow. Stays silent in
         #    INTRO[0], OUTRO, and entirely for ambient.
+        # Transition detection: if THIS bar is the last bar of A or
+        # B and the NEXT bar starts a different section (A→B, B→A'),
+        # swap in the dedicated fill cell so the listener feels the
+        # structural shift. Probabilistic (70%) so it doesn't become
+        # mechanical at every transition.
+        nxt_section = (bars_meta[bar_idx + 1]["section"]
+                       if bar_idx + 1 < len(bars_meta) else None)
+        is_fill_bar = (
+            section in ("A", "B")
+            and nxt_section is not None
+            and nxt_section != section
+            and nxt_section != "OUTRO"
+            and rng.random() < 0.70
+        )
         if not is_final and not (section == "INTRO" and bar_idx == 0):
-            for off, kind, vel_mult in percussion_pattern_for(
-                genre, meter, section, rng,
-            ):
+            cell = (percussion_fill_for(genre, meter)
+                    if is_fill_bar
+                    else percussion_pattern_for(genre, meter, section, rng))
+            for off, kind, vel_mult in cell:
                 # fade percussion in over the INTRO and out over the OUTRO
                 fade = 1.0
                 if section == "INTRO":
