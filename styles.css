@@ -661,7 +661,21 @@ body.detail-open { overflow: hidden; }
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
+  /* Leave room for the absolutely-positioned close (✕) at top:0.75rem;
+     right:0.85rem of .detail-inner. ~2.5rem keeps pin buttons clear
+     of the close button on both desktop and mobile. */
+  padding-right: 2.5rem;
 }
+
+/* Pin badge on variant chip — small ⭐/👎 next to chip label. */
+.chip-pin {
+  margin-left: 0.35rem;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.9;
+}
+.chip-pin-legendary { color: #b48b00; }
+.chip-pin-worst     { color: #a04a30; }
 .pin-bar {
   display: flex;
   gap: 0.35rem;
