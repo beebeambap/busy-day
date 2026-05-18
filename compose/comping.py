@@ -738,68 +738,165 @@ def bass_pitch(degree_to_midi_fn, key, mode, chord_root, kind: str) -> int:
 # steady while the texture varies.
 
 _P44 = {
-    "ambient":      [
+    "ambient": [
+        # canonical: silent — pad-only texture, no pulse
         [],
-        [],
+        # alt 1: ultra-minimal "clock tick" on beat 1 only. Stays
+        # almost subliminal (vel 0.20) so the pad still dominates,
+        # but the listener gets a faint pulse signal so the song
+        # doesn't feel totally adrift.
+        [(0.0, "brush", 0.22)],
+        # alt 2: half-bar breath — soft brush on 1 and 3
+        [(0.0, "brush", 0.22), (2.0, "brush", 0.18)],
     ],
     "neo_classical": [
+        # canonical: light tap on 1 + 3 (Yiruma piano pulse)
         [(0.0, "tap", 0.55), (2.0, "tap", 0.45)],
+        # alt 1: tap + brush ghost on the off-beat between
         [(0.0, "tap", 0.55), (1.5, "brush", 0.40), (2.0, "tap", 0.45)],
+        # alt 2: pedal-like single tap on 1 (very sparse). Pairs
+        # with the held-suspension harmony cell where the bar is
+        # essentially one sustained chord.
+        [(0.0, "tap", 0.50)],
+        # alt 3: light march — tap every quarter (alternating
+        # strong/weak). Used sparingly so it doesn't feel mechanical.
+        [(0.0, "tap", 0.55), (1.0, "tap", 0.32),
+         (2.0, "tap", 0.50), (3.0, "tap", 0.32)],
     ],
     "folk": [
+        # canonical: boom-tap on 1+3, brush back-beat on 2+4
         [(0.0, "tap", 0.50), (1.0, "brush", 0.65),
          (2.0, "tap", 0.45), (3.0, "brush", 0.65)],
-        # alt: double-brush on 2 & 4 for emphasis
+        # alt 1: double-brush on 2 & 4 for emphasis
         [(0.0, "tap", 0.50),
          (1.0, "brush", 0.65), (1.5, "brush", 0.45),
          (2.0, "tap", 0.45),
          (3.0, "brush", 0.65), (3.5, "brush", 0.45)],
+        # alt 2: all-quarter brush (lighter, evenly spaced pulse).
+        # Pairs with the Celtic-drone harmony cell where the chord
+        # sustains and rhythm becomes the lead voice.
+        [(0.0, "brush", 0.55), (1.0, "brush", 0.50),
+         (2.0, "brush", 0.55), (3.0, "brush", 0.50)],
+        # alt 3: folk-stomp — kick on 1+3, snare on 2+4
+        # (Mumford & Sons / Avett Brothers feel). Different timbre
+        # from the boom-tap canonical for clear contrast.
+        [(0.0, "kick", 0.65), (1.0, "snare", 0.55),
+         (2.0, "kick", 0.62), (3.0, "snare", 0.55)],
     ],
     "bossa_nova": [
+        # canonical: full shaker 8ths — the bossa pulse signature
         [(0.0, "shaker", 0.55), (0.5, "shaker", 0.40),
          (1.0, "shaker", 0.55), (1.5, "shaker", 0.40),
          (2.0, "shaker", 0.55), (2.5, "shaker", 0.40),
          (3.0, "shaker", 0.55), (3.5, "shaker", 0.40)],
-        # alt: tap on 1 + 3, lighter shaker between
+        # alt 1: tap accent on 1 + 3 + shaker between (Astrud Gilberto)
         [(0.0, "tap",    0.55),
          (0.5, "shaker", 0.35), (1.0, "shaker", 0.45),
          (1.5, "shaker", 0.35),
          (2.0, "tap",    0.50),
          (2.5, "shaker", 0.35), (3.0, "shaker", 0.45),
          (3.5, "shaker", 0.35)],
+        # alt 2: shaker on off-beats only — lazy, half-density.
+        # Sounds like the player is brushing every other 8th.
+        [(0.5, "shaker", 0.48), (1.5, "shaker", 0.42),
+         (2.5, "shaker", 0.48), (3.5, "shaker", 0.42)],
+        # alt 3: ballad bossa — shaker on 1+3, brush back-beat-ish on
+        # 1.5. Very spacious (Tom Jobim solo recordings).
+        [(0.0, "shaker", 0.40), (1.5, "brush", 0.38),
+         (3.0, "shaker", 0.40)],
     ],
     "jazz_ballad": [
+        # canonical: ride with brush back-beats — quintessential
+        # jazz comping
         [(0.0, "ride", 0.40), (1.0, "brush", 0.55),
          (1.5, "ride", 0.30), (2.0, "ride", 0.40),
          (2.5, "ride", 0.30), (3.0, "brush", 0.55),
          (3.5, "ride", 0.30)],
-        # alt: brushes only — softer chorus-like feel
+        # alt 1: brushes only — softer chorus-like feel
         [(0.0, "brush", 0.45), (1.0, "brush", 0.55),
          (2.0, "brush", 0.45), (3.0, "brush", 0.55)],
+        # alt 2: ride on 2 & 4 only — extremely spacious "tea-room"
+        # cell where the bass walks alone for most of the bar
+        [(1.0, "ride", 0.42), (3.0, "ride", 0.42)],
+        # alt 3: brush back-beat — chunky snare-like on 2 + 4 (jazz
+        # waltz / shuffle hybrid feel). Pairs with the rubato whole-
+        # note harmony cell.
+        [(1.0, "brush", 0.55), (3.0, "brush", 0.55)],
     ],
     "lo_fi": [
+        # canonical: kick + 8th-note hats + snare on 3
         [(0.0, "kick",  0.75),
          (0.5, "hat",   0.30), (1.0, "hat", 0.30), (1.5, "hat", 0.30),
          (2.0, "snare", 0.65),
          (2.5, "hat",   0.30), (3.0, "hat", 0.30), (3.5, "hat", 0.30)],
-        # alt: kick on 1+2.5 (syncopated), snare 3
+        # alt 1: kick on 1+2.5 (syncopated), snare 3
         [(0.0, "kick",  0.75),
          (0.5, "hat",   0.30), (1.0, "hat", 0.30), (1.5, "hat", 0.30),
          (2.0, "snare", 0.60),
          (2.5, "kick",  0.55), (3.0, "hat", 0.30), (3.5, "hat", 0.30)],
+        # alt 2: half-time — kick on 1, snare on 3 only. The "boom-bap
+        # sub" feel where the kit lays back and the bass+pad carry.
+        [(0.0, "kick", 0.72), (2.0, "snare", 0.60)],
+        # alt 3: muted kick eighths + hats — kick on every beat at
+        # lower vel for a propulsive but soft groove
+        [(0.0, "kick", 0.62), (0.5, "hat", 0.30),
+         (1.0, "kick", 0.48), (1.5, "hat", 0.30),
+         (2.0, "snare", 0.62), (2.5, "hat", 0.30),
+         (3.0, "kick", 0.48), (3.5, "hat", 0.30)],
     ],
 }
 
+# ── percussion fill cells (transition bars only) ──────────────────
+# Used at the last bar of A→B and B→A' transitions to signal the
+# section change. Deliberately busier than any normal cell so the
+# listener feels the structural shift. Kept in a separate dict so
+# the random alt-picker never selects them on a non-transition bar.
+_PFILL_44 = {
+    "ambient":       [(2.0, "brush", 0.32), (3.0, "brush", 0.28)],
+    "neo_classical": [(0.0, "tap", 0.50),
+                      (2.0, "tap", 0.50), (2.5, "brush", 0.40),
+                      (3.0, "tap", 0.40), (3.5, "brush", 0.40)],
+    "folk":          [(0.0, "tap", 0.55), (0.5, "brush", 0.40),
+                      (1.0, "brush", 0.55), (1.5, "brush", 0.40),
+                      (2.0, "tap", 0.50), (2.5, "brush", 0.45),
+                      (3.0, "brush", 0.55), (3.5, "brush", 0.45)],
+    # bossa: clave-like fill (3-2 son pattern) instead of plain shaker
+    "bossa_nova":    [(0.0, "tap", 0.70), (1.5, "tap", 0.50),
+                      (2.5, "tap", 0.65), (3.0, "tap", 0.50),
+                      (0.0, "shaker", 0.45), (0.5, "shaker", 0.35),
+                      (1.0, "shaker", 0.45), (1.5, "shaker", 0.35),
+                      (2.0, "shaker", 0.45), (2.5, "shaker", 0.35),
+                      (3.0, "shaker", 0.45), (3.5, "shaker", 0.35)],
+    "jazz_ballad":   [(0.0, "ride", 0.45), (0.5, "ride", 0.32),
+                      (1.0, "brush", 0.58), (1.5, "ride", 0.32),
+                      (2.0, "ride", 0.45), (2.5, "ride", 0.32),
+                      (3.0, "brush", 0.58), (3.5, "ride", 0.32)],
+    # lo_fi: trap-style hi-hat roll
+    "lo_fi":         [(0.0, "kick", 0.75), (0.0, "hat", 0.35),
+                      (0.5, "hat", 0.35), (1.0, "hat", 0.30),
+                      (1.5, "hat", 0.35),
+                      (2.0, "snare", 0.62),
+                      (2.5, "hat", 0.30), (3.0, "hat", 0.35),
+                      (3.5, "hat", 0.35), (3.75, "snare", 0.45)],
+}
+
 _P34 = {
-    "ambient":      [[], []],
+    "ambient":      [[], [(0.0, "brush", 0.20)]],
     "neo_classical": [
         [(0.0, "tap", 0.55)],
         [(0.0, "tap", 0.55), (2.0, "tap", 0.40)],
+        [(0.0, "tap", 0.50), (1.0, "tap", 0.30), (2.0, "tap", 0.30)],
     ],
     "folk": [
+        # canonical: waltz boom-chick-chick
         [(0.0, "tap", 0.55), (1.0, "brush", 0.55), (2.0, "brush", 0.55)],
+        # alt 1: brush 8th split on beat 2
         [(0.0, "tap", 0.55), (1.0, "brush", 0.55),
          (1.5, "brush", 0.40), (2.0, "brush", 0.55)],
+        # alt 2: all-brush waltz (lighter)
+        [(0.0, "brush", 0.50), (1.0, "brush", 0.50), (2.0, "brush", 0.50)],
+        # alt 3: stomp waltz — kick on 1, snare on 2 + 3
+        [(0.0, "kick", 0.65), (1.0, "snare", 0.50), (2.0, "snare", 0.45)],
     ],
     "bossa_nova": [
         [(0.0, "shaker", 0.55), (0.5, "shaker", 0.40),
@@ -809,28 +906,60 @@ _P34 = {
          (0.5, "shaker", 0.35), (1.0, "shaker", 0.45),
          (1.5, "shaker", 0.35), (2.0, "shaker", 0.45),
          (2.5, "shaker", 0.35)],
+        # alt 2: half-density shaker (off-beats only)
+        [(0.5, "shaker", 0.42), (1.5, "shaker", 0.42),
+         (2.5, "shaker", 0.42)],
     ],
     "jazz_ballad": [
         [(0.0, "ride", 0.40), (1.0, "brush", 0.55), (2.0, "ride", 0.40)],
         [(0.0, "brush", 0.45), (1.0, "brush", 0.55), (2.0, "brush", 0.45)],
+        [(1.0, "ride", 0.42), (2.0, "ride", 0.42)],  # super sparse
     ],
     "lo_fi": [
         [(0.0, "kick", 0.70), (1.0, "snare", 0.55), (2.0, "snare", 0.55)],
         [(0.0, "kick", 0.70), (1.5, "snare", 0.55),
          (2.0, "hat", 0.30), (2.5, "hat", 0.30)],
+        # alt 2: half-time waltz
+        [(0.0, "kick", 0.72), (2.0, "snare", 0.55)],
     ],
+}
+_PFILL_34 = {
+    "ambient":       [(0.0, "brush", 0.28), (2.0, "brush", 0.22)],
+    "neo_classical": [(0.0, "tap", 0.50), (1.0, "brush", 0.40),
+                      (2.0, "tap", 0.40), (2.5, "brush", 0.40)],
+    "folk":          [(0.0, "tap", 0.55),
+                      (1.0, "brush", 0.55), (1.5, "brush", 0.45),
+                      (2.0, "brush", 0.55), (2.5, "brush", 0.45)],
+    "bossa_nova":    [(0.0, "tap", 0.60), (0.5, "shaker", 0.40),
+                      (1.0, "shaker", 0.45), (1.5, "shaker", 0.40),
+                      (2.0, "shaker", 0.45), (2.5, "shaker", 0.40)],
+    "jazz_ballad":   [(0.0, "ride", 0.45), (1.0, "brush", 0.58),
+                      (1.5, "ride", 0.30), (2.0, "ride", 0.45),
+                      (2.5, "ride", 0.30)],
+    "lo_fi":         [(0.0, "kick", 0.75), (0.5, "hat", 0.35),
+                      (1.0, "hat", 0.30), (1.5, "hat", 0.35),
+                      (2.0, "snare", 0.60), (2.5, "hat", 0.35)],
 }
 
 _P68 = {
-    "ambient":      [[], []],
+    "ambient":      [[], [(0.0, "brush", 0.22), (3.0, "brush", 0.20)]],
     "neo_classical": [
         [(0.0, "tap", 0.55), (3.0, "tap", 0.45)],
         [(0.0, "tap", 0.55), (3.0, "brush", 0.40)],
+        [(0.0, "tap", 0.50)],  # sparse
     ],
     "folk": [
+        # canonical: dotted-quarter jig pulse
         [(0.0, "tap", 0.55), (3.0, "brush", 0.60)],
+        # alt 1: subdivided eighths in beat 2
         [(0.0, "tap", 0.55), (1.5, "brush", 0.40),
          (3.0, "brush", 0.60), (4.5, "brush", 0.40)],
+        # alt 2: all-brush jig (lighter)
+        [(0.0, "brush", 0.50), (1.5, "brush", 0.40),
+         (3.0, "brush", 0.50), (4.5, "brush", 0.40)],
+        # alt 3: jig stomp — kick on 1+4, brush off-beats
+        [(0.0, "kick", 0.60), (1.5, "brush", 0.40),
+         (3.0, "kick", 0.60), (4.5, "brush", 0.40)],
     ],
     "bossa_nova": [
         [(0.0, "shaker", 0.55), (1.0, "shaker", 0.40),
@@ -840,17 +969,40 @@ _P68 = {
          (1.0, "shaker", 0.35), (2.0, "shaker", 0.35),
          (3.0, "tap",    0.50),
          (4.0, "shaker", 0.35), (5.0, "shaker", 0.35)],
+        # alt 2: shaker on off-beats (3 hits)
+        [(1.0, "shaker", 0.45), (2.0, "shaker", 0.40),
+         (4.0, "shaker", 0.45), (5.0, "shaker", 0.40)],
     ],
     "jazz_ballad": [
         [(0.0, "ride", 0.40), (3.0, "ride", 0.40),
          (1.5, "brush", 0.45), (4.5, "brush", 0.45)],
         [(0.0, "brush", 0.45), (3.0, "brush", 0.55)],
+        [(1.5, "ride", 0.40), (4.5, "ride", 0.40)],  # off-beat ride only
     ],
     "lo_fi": [
         [(0.0, "kick", 0.70), (3.0, "snare", 0.55)],
         [(0.0, "kick", 0.70), (1.5, "hat", 0.30),
          (3.0, "snare", 0.55), (4.5, "hat", 0.30)],
+        # alt 2: half-time (one hit only)
+        [(0.0, "kick", 0.72)],
     ],
+}
+_PFILL_68 = {
+    "ambient":       [(0.0, "brush", 0.28), (3.0, "brush", 0.25)],
+    "neo_classical": [(0.0, "tap", 0.50), (1.5, "brush", 0.40),
+                      (3.0, "tap", 0.45), (4.5, "brush", 0.40)],
+    "folk":          [(0.0, "tap", 0.55), (1.5, "brush", 0.40),
+                      (2.5, "brush", 0.35),
+                      (3.0, "brush", 0.60), (4.5, "brush", 0.45),
+                      (5.5, "brush", 0.35)],
+    "bossa_nova":    [(0.0, "tap", 0.65), (1.0, "shaker", 0.45),
+                      (2.0, "shaker", 0.45), (3.0, "tap", 0.55),
+                      (4.0, "shaker", 0.45), (5.0, "shaker", 0.45)],
+    "jazz_ballad":   [(0.0, "ride", 0.45), (1.5, "brush", 0.55),
+                      (3.0, "ride", 0.45), (4.5, "brush", 0.55)],
+    "lo_fi":         [(0.0, "kick", 0.75), (1.5, "hat", 0.35),
+                      (3.0, "snare", 0.60), (4.5, "hat", 0.35),
+                      (5.5, "snare", 0.45)],
 }
 
 
@@ -860,6 +1012,18 @@ def percussion_pattern_for(genre: str, meter: str,
     table = {3: _P34, 4: _P44, 6: _P68}.get(bpb, _P44)
     cells = table.get(genre, [[]])
     return _pick_cell(cells, section, rng)
+
+
+def percussion_fill_for(genre: str, meter: str):
+    """Return the dedicated transition-fill cell for (genre, meter).
+
+    Used at the last bar before a structural section change (A→B,
+    B→A'). Busier than any normal cell so the listener feels the
+    shift coming. Kept separate from the alt pool so it never fires
+    on a non-transition bar."""
+    bpb = int(meter.split("/")[0])
+    table = {3: _PFILL_34, 4: _PFILL_44, 6: _PFILL_68}.get(bpb, _PFILL_44)
+    return table.get(genre, [])
 
 
 # Backward-compatible: no-rng helper returns the canonical cell.
