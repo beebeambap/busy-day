@@ -244,6 +244,7 @@ def compose_ir(
     drone_on = cloud_pct >= 70.0  # cloudy day → fog-drone
     drone_events: list[dict] = []
     motif = spec["motif"]
+    sub_style = spec.get("sub_style")  # None if genre has no sub-styles
     bpb = _beats_per_bar(meter)
 
     sec_len = _section_lengths(genre, bpm, bpb, target_sec=target_sec)
@@ -420,7 +421,7 @@ def compose_ir(
         else:
             har_base_vel = 56 + int(rng.uniform(-3, 3))
             for off, dur, kind, vel_mult in harmony_pattern_for(
-                genre, meter, section, rng,
+                genre, meter, section, rng, sub_style=sub_style,
             ):
                 pitches = chord_subset(full_chord, kind)
                 if not pitches:
@@ -448,7 +449,7 @@ def compose_ir(
             })
         else:
             for off, dur, kind in bass_pattern_for(
-                genre, meter, section, rng,
+                genre, meter, section, rng, sub_style=sub_style,
             ):
                 pitch = _bass_pitch(degree_to_midi, key, mode,
                                     chord_root, kind)
@@ -488,7 +489,8 @@ def compose_ir(
         if not is_final and not (section == "INTRO" and bar_idx == 0):
             cell = (percussion_fill_for(genre, meter)
                     if is_fill_bar
-                    else percussion_pattern_for(genre, meter, section, rng))
+                    else percussion_pattern_for(genre, meter, section, rng,
+                                                sub_style=sub_style))
             for off, kind, vel_mult in cell:
                 # fade percussion in over the INTRO and out over the OUTRO
                 fade = 1.0
@@ -609,6 +611,7 @@ def compose_ir(
             "meter": meter,
             "motif_id": motif["id"],
             "voicing": voicing,
+            "sub_style": sub_style,
         },
         "features": features.as_dict(),
         "form": form,
