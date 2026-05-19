@@ -64,6 +64,16 @@ def pick_oct_climb(rng: Random, f, intent_id: str | None) -> bool:
     return rng.random() < p
 
 
+def pick_sub_bass(rng: Random, f) -> bool:
+    """Per-song decision: bass adds -1 oct sub-bass doubling on downbeats.
+    Wetness drives it (rainy/snowy days → deeper bass). Bounded with a
+    floor (~5%) and ceiling (~50%) so the effect is meaningful but not
+    overwhelming. Like sub_style and oct_climb, decided once per song;
+    the actual per-event firing is a separate roll."""
+    p = 0.05 + 0.45 * f.wetness
+    return rng.random() < p
+
+
 def _weighted_choice(rng: Random, items: list, weights: list[float]) -> Any:
     total = sum(weights)
     r = rng.random() * total
