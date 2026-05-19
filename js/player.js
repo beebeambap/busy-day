@@ -503,11 +503,26 @@ export function decideAmbience(weather, features) {
 
   if (pcp > 0.1) {
     const intensity = _clip01(pcp / 10.0);
-    layers.push({
-      type: "rain",
-      volume_db: round1(-34 + _clip01(pcp / 20) * 20),
-      intensity,
-    });
+    const isSnow = (w.precip_type === "snow" || w.precip_type === "rain_snow");
+    if (isSnow) {
+      // Real snow is essentially silent — use a very quiet brown-noise
+      // hush instead of the rain layer. Volume capped low so it reads
+      // as "winter atmosphere", not as a sonic event.
+      layers.push({
+        type: "snow",
+        volume_db: round1(-44 + _clip01(pcp / 12) * 10),  // -44..-34
+        intensity,
+      });
+    } else {
+      // Rain volume tightened — old -34..-14 was loud enough to mask
+      // the music on heavy-rain days. New -44..-28 sits behind the
+      // melody like real-life café-window rain.
+      layers.push({
+        type: "rain",
+        volume_db: round1(-44 + _clip01(pcp / 15) * 16),
+        intensity,
+      });
+    }
   }
 
   if (wind > 4.0) {
@@ -554,9 +569,14 @@ function round1(x) { return Math.round(x * 10) / 10; }
 function round2(x) { return Math.round(x * 100) / 100; }
 
 function _makeRain(volumeDb, intensity = 0.5) {
+  // Filter cutoff lowered from 1200-3400 to 700-1900Hz. The old high
+  // range overlapped the music's presence band (piano top notes,
+  // articulation transients) and the rain noise was masking detail.
+  // Below 2kHz the noise reads as "outside on a wet day" without
+  // competing with the melody.
   const noise = new Tone.Noise("pink");
   const filt = new Tone.Filter({
-    frequency: 1200 + intensity * 2200,
+    frequency: 700 + intensity * 1200,
     type: "lowpass",
     rolloff: -24,
     Q: 0.5,
@@ -572,6 +592,33 @@ function _makeRain(volumeDb, intensity = 0.5) {
         try { noise.stop(); } catch {}
         noise.dispose(); filt.dispose(); gain.dispose();
       }, 700);
+    },
+  };
+}
+
+function _makeSnow(volumeDb, intensity = 0.3) {
+  // Snow is whisper-quiet in reality. A very narrow low-passed brown
+  // noise gives a "cold quiet" atmosphere — more "felt" than "heard".
+  // Brown noise (1/f²) is warmer / less hissy than pink, fitting the
+  // muffled-by-snow soundscape.
+  const noise = new Tone.Noise("brown");
+  const filt = new Tone.Filter({
+    frequency: 400 + intensity * 200,   // 400-600 Hz, deep hush
+    type: "lowpass",
+    rolloff: -24,
+    Q: 0.3,
+  });
+  const gain = toMaster(new Tone.Gain(0));
+  noise.chain(filt, gain);
+  noise.start();
+  gain.gain.rampTo(Tone.dbToGain(volumeDb), 2.0);
+  return {
+    dispose() {
+      gain.gain.rampTo(0, 0.8);
+      setTimeout(() => {
+        try { noise.stop(); } catch {}
+        noise.dispose(); filt.dispose(); gain.dispose();
+      }, 900);
     },
   };
 }
@@ -674,6 +721,7 @@ function _makeHum(volumeDb) {
 
 const AMB_FACTORIES = {
   rain:   (l) => _makeRain  (l.volume_db, l.intensity),
+  snow:   (l) => _makeSnow  (l.volume_db, l.intensity),
   wind:   (l) => _makeWind  (l.volume_db, l.intensity),
   birds:  (l) => _makeBirds (l.volume_db, l.density),
   indoor: (l) => _makeIndoor(l.volume_db),

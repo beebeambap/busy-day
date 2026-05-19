@@ -74,6 +74,27 @@ def pick_sub_bass(rng: Random, f) -> bool:
     return rng.random() < p
 
 
+def pick_bass_octave_shift(rng: Random, f) -> int:
+    """Bass register macro shift: 0 (current default, deep) or +1 (lighter).
+
+    Bright + dry days tilt the bass UP an octave for a "lighter" feel —
+    less ballad weight, more pop-folk energy. Wet/dim days stay at the
+    current deep default. Probabilistic so a bright week still has some
+    deep bass variety."""
+    p_light = 0.08 + 0.32 * f.brightness * (1.0 - f.wetness)
+    return 1 if rng.random() < p_light else 0
+
+
+def pick_use_ninth(rng: Random, f) -> bool:
+    """Per-song decision: B-section voicing pick prefers 9th over 7th.
+
+    9th adds bright/airy color (root + 3rd + 5th + 7th + 9th = the
+    'tropical café' sound CLEAR_HOT tape uses). Brightness drives the
+    probability — appropriate for sunny days, suppressed for dim/wet."""
+    p = 0.10 + 0.40 * f.brightness
+    return rng.random() < p
+
+
 def _weighted_choice(rng: Random, items: list, weights: list[float]) -> Any:
     total = sum(weights)
     r = rng.random() * total

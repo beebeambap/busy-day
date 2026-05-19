@@ -261,6 +261,8 @@ def compose_ir(
     melody_octave = int(spec.get("melody_octave", 5))
     oct_climb_in_song = bool(spec.get("oct_climb", False))
     sub_bass_in_song = bool(spec.get("sub_bass", False))
+    bass_oct_shift = int(spec.get("bass_oct_shift", 0))   # 0 = deep, 1 = lighter
+    use_ninth_in_song = bool(spec.get("use_ninth", False))
     bpb = _beats_per_bar(meter)
 
     sec_len = _section_lengths(genre, bpm, bpb, target_sec=target_sec)
@@ -417,7 +419,13 @@ def compose_ir(
         bar_voicing = voicing
         if not is_final:
             if section == "B" and voicing == "triad":
-                if rng.random() < 0.42:
+                # Bright songs flagged with use_ninth occasionally pick
+                # the airier 9th voicing (root+3+5+7+9) instead of plain
+                # 7th — the "tropical café" color. Suppressed on dim/wet
+                # days where the picker won't be flagged.
+                if use_ninth_in_song and rng.random() < 0.28:
+                    bar_voicing = "ninth"
+                elif rng.random() < 0.42:
                     bar_voicing = "seventh"
             # Celtic open-fifth drone: the defining Muji-Celtic sound.
             # Expanded to all folk meters (was 6/8 only) and added A_PRIME.
@@ -479,6 +487,10 @@ def compose_ir(
             ):
                 pitch = _bass_pitch(degree_to_midi, key, mode,
                                     chord_root, kind)
+                # Macro register shift: bright/dry days lift the bass
+                # up an octave for a lighter feel. Wet/dim days stay
+                # at the current deep default (bass_oct_shift = 0).
+                pitch += 12 * bass_oct_shift
                 if not (24 <= pitch <= 60):
                     continue
                 vel = 58 + int(rng.uniform(-3, 3))
@@ -663,6 +675,8 @@ def compose_ir(
             "melody_octave": melody_octave,
             "oct_climb": oct_climb_in_song,
             "sub_bass": sub_bass_in_song,
+            "bass_oct_shift": bass_oct_shift,
+            "use_ninth": use_ninth_in_song,
         },
         "features": features.as_dict(),
         "form": form,
