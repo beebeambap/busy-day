@@ -173,11 +173,24 @@ def _apply_activity_density(bars, activity_factor, rng):
     return out_bars
 
 
-def _spread_for(warmth: float) -> str:
-    """Voicing spread from normalized warmth (0..1)."""
-    if warmth < 0.30:
+def _spread_for(features: Features) -> str:
+    """Voicing spread driven by wind (= 1-calmness) primarily, with
+    warmth as a secondary nudge.
+
+    - Strong wind / activity → "wide" (open, airy)
+    - Very calm air → "tight" (intimate, close-knit)
+    - Warm tilts toward wide, cold tilts toward tight on the margin
+
+    Wind is the better proxy for "open/closed feeling" than warmth
+    alone: a cold windy day on the rooftop feels MORE open than a
+    warm muggy still day — spread should follow the open/closed
+    perception, not the temperature reading.
+    """
+    activity = 1.0 - features.calmness          # 0(calm) .. 1(windy)
+    score = activity * 0.7 + (features.warmth - 0.5) * 0.4
+    if score < -0.05:
         return "tight"
-    if warmth > 0.70:
+    if score > 0.30:
         return "wide"
     return "default"
 
@@ -239,7 +252,7 @@ def compose_ir(
     key = spec["key_root"]
     genre = spec["genre"]
     meter = spec["meter"]
-    voicing_spread = _spread_for(features.warmth)
+    voicing_spread = _spread_for(features)
     cloud_pct = float((weather or {}).get("cloud_pct", 50.0))
     drone_on = cloud_pct >= 70.0  # cloudy day → fog-drone
     drone_events: list[dict] = []
@@ -247,6 +260,7 @@ def compose_ir(
     sub_style = spec.get("sub_style")
     melody_octave = int(spec.get("melody_octave", 5))
     oct_climb_in_song = bool(spec.get("oct_climb", False))
+    sub_bass_in_song = bool(spec.get("sub_bass", False))
     bpb = _beats_per_bar(meter)
 
     sec_len = _section_lengths(genre, bpm, bpb, target_sec=target_sec)
@@ -481,6 +495,28 @@ def compose_ir(
                     "vel": max(30, min(85, vel)),
                 })
 
+                # Sub-bass doubling on downbeat root events when the
+                # song was flagged for sub-bass (wet days). Adds an
+                # octave-lower copy with reduced velocity → "deep cafe"
+                # weight without losing the original pitch. ~30% of
+                # eligible events fire so the effect is felt but not
+                # constant.
+                if (sub_bass_in_song
+                        and kind == "root"
+                        and off == 0.0
+                        and rng.random() < 0.30):
+                    sub_pitch = pitch - 12
+                    # MIDI 16 ≈ E0 (24 Hz); below this it's sub-audible
+                    # rumble that mostly muds the mix.
+                    if sub_pitch >= 16:
+                        bass_events.append({
+                            "bar": cur_bar,
+                            "start_beat": round(off, 4),
+                            "pitch": sub_pitch,
+                            "dur_beats": round(min(dur, 1.0), 4),
+                            "vel": max(28, vel - 12),
+                        })
+
         # ── percussion: defines the pulse so the listener can feel
         #    time even when chord changes are slow. Stays silent in
         #    INTRO[0], OUTRO, and entirely for ambient.
@@ -626,6 +662,7 @@ def compose_ir(
             "sub_style": sub_style,
             "melody_octave": melody_octave,
             "oct_climb": oct_climb_in_song,
+            "sub_bass": sub_bass_in_song,
         },
         "features": features.as_dict(),
         "form": form,

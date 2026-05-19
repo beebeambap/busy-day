@@ -18,6 +18,7 @@ from .mapping import (
     pick_mode,
     pick_motif,
     pick_oct_climb,
+    pick_sub_bass,
     pick_sub_style,
 )
 from .seed import make_seed, rng
@@ -76,6 +77,7 @@ def _decide_spec(
     melody_octave = pick_melody_octave(s("mel_oct"), features)
     intent_id_for_climb = intent.id if intent else None
     oct_climb = pick_oct_climb(s("oct_climb"), features, intent_id_for_climb)
+    sub_bass = pick_sub_bass(s("sub_bass"), features)
 
     return {
         "key_root": key, "mode": mode, "genre": genre,
@@ -83,6 +85,7 @@ def _decide_spec(
         "sub_style": sub_style,
         "melody_octave": melody_octave,
         "oct_climb": oct_climb,
+        "sub_bass": sub_bass,
         "intent_id": intent.id if intent else None,
     }
 
