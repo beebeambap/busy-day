@@ -10,6 +10,7 @@ from .arrange import compose_ir
 from .features import extract
 from .intent import Intent, apply as apply_intent
 from .mapping import (
+    pick_bass_octave_shift,
     pick_bpm,
     pick_genre,
     pick_key,
@@ -20,6 +21,7 @@ from .mapping import (
     pick_oct_climb,
     pick_sub_bass,
     pick_sub_style,
+    pick_use_ninth,
 )
 from .seed import make_seed, rng
 
@@ -78,6 +80,8 @@ def _decide_spec(
     intent_id_for_climb = intent.id if intent else None
     oct_climb = pick_oct_climb(s("oct_climb"), features, intent_id_for_climb)
     sub_bass = pick_sub_bass(s("sub_bass"), features)
+    bass_oct_shift = pick_bass_octave_shift(s("bass_oct"), features)
+    use_ninth = pick_use_ninth(s("ninth"), features)
 
     return {
         "key_root": key, "mode": mode, "genre": genre,
@@ -86,6 +90,8 @@ def _decide_spec(
         "melody_octave": melody_octave,
         "oct_climb": oct_climb,
         "sub_bass": sub_bass,
+        "bass_oct_shift": bass_oct_shift,
+        "use_ninth": use_ninth,
         "intent_id": intent.id if intent else None,
     }
 
