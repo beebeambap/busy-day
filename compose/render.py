@@ -6,12 +6,58 @@ rendering (FluidSynth -> WAV -> MP3 via ffmpeg).
 
 from __future__ import annotations
 
+from random import Random
+
 import mido
 
 from .comping import GM_DRUM_NOTE
 
 TICKS_PER_BEAT = 480
 PERC_NOTE_LEN_BEATS = 0.08    # short stab so the drum note doesn't sustain
+
+# ── acoustic salt (anti-fingerprint-collision) ──────────────────────
+# Audio fingerprinters (ACRCloud / Content ID) hash time-frequency
+# spectral peaks. Ambient music concentrates energy in a narrow
+# register with repetitive chord progressions, so different songs can
+# produce near-identical fingerprints and trip false-positive matches.
+#
+# We bake a tiny, deterministic, per-song "salt" into the MIDI:
+#   - global micro-detune  (±12..30 cents) → shifts every spectral peak
+#     off the standard tuning grid where reference tracks sit
+#   - tempo micro-jitter    (±1.5%)         → shifts the onset-interval
+#     hashes on the time axis
+# Both are sub-perceptual (a quarter-tone is 50 cents; 1.5% tempo is
+# inaudible) but together they move the fingerprint on BOTH axes, which
+# is what breaks exact-match landmark hashing. Derived from the song
+# seed so re-rendering is reproducible yet unique per (date, city).
+_SALT_XOR = 0xACE5A17
+
+
+def acoustic_salt(seed: int) -> tuple[float, int]:
+    """Return (tempo_factor, detune_cents) for a song seed."""
+    rng = Random(seed ^ _SALT_XOR)
+    tempo_factor = 1.0 + rng.uniform(-0.015, 0.015)
+    mag = rng.uniform(12.0, 30.0)
+    detune_cents = int(round(mag if rng.random() < 0.5 else -mag))
+    return tempo_factor, detune_cents
+
+
+def _append_detune(track: "mido.MidiTrack", channel: int, cents: int) -> None:
+    """Set channel pitch-bend range to ±2 semitones (RPN 0) then apply a
+    static pitch bend equal to `cents`. All notes on the channel inherit
+    the bend → a uniform global detune (no chorusing, inaudible)."""
+    if cents == 0:
+        return
+    cc = lambda c, v: mido.Message("control_change", channel=channel,
+                                   control=c, value=v, time=0)
+    # RPN 0,0 = pitch-bend sensitivity; data entry = 2 semitones
+    track.append(cc(101, 0)); track.append(cc(100, 0))
+    track.append(cc(6, 2));   track.append(cc(38, 0))
+    # close RPN so later data-entry CCs can't drift the setting
+    track.append(cc(101, 127)); track.append(cc(100, 127))
+    bend = max(-8192, min(8191, round(cents / 200.0 * 8192)))
+    track.append(mido.Message("pitchwheel", channel=channel,
+                              pitch=bend, time=0))
 
 # General MIDI program numbers (0-indexed) per genre & track
 GM_PROGRAMS = {
@@ -96,12 +142,19 @@ def render_midi(ir: dict, path: str) -> None:
 
     pedals = ir.get("pedals", [])
 
+    # Per-song acoustic salt: sub-perceptual detune + tempo jitter so the
+    # rendered audio's fingerprint sits off the standard grid (see
+    # acoustic_salt docstring). Seed comes from the IR meta.
+    seed = int(ir.get("meta", {}).get("seed", 0))
+    tempo_factor, detune_cents = acoustic_salt(seed)
+    salted_bpm = bpm * tempo_factor
+
     mid = mido.MidiFile(type=1, ticks_per_beat=TICKS_PER_BEAT)
 
     # tempo + meter on track 0
     meta = mido.MidiTrack()
     meta.append(mido.MetaMessage("set_tempo",
-                                 tempo=mido.bpm2tempo(bpm), time=0))
+                                 tempo=mido.bpm2tempo(salted_bpm), time=0))
     n, d = (int(x) for x in spec["meter"].split("/"))
     meta.append(mido.MetaMessage("time_signature",
                                  numerator=n, denominator=d, time=0))
@@ -111,6 +164,7 @@ def render_midi(ir: dict, path: str) -> None:
 
     # melody (with sustain pedal CC64 on the same channel)
     mel = _track_with_program("melody", programs["melody"], channel=0)
+    _append_detune(mel, channel=0, cents=detune_cents)
     mel_msgs = _events_to_messages(ir["tracks"]["melody"], channel=0, bpb=bpb)
     mel_msgs += _pedal_messages(pedals, channel=0, bpb=bpb)
     _flush_track(mel, mel_msgs)
@@ -118,6 +172,7 @@ def render_midi(ir: dict, path: str) -> None:
 
     # harmony (also pedaled to keep pad legato across chord changes)
     har = _track_with_program("harmony", programs["harmony"], channel=1)
+    _append_detune(har, channel=1, cents=detune_cents)
     har_msgs = _events_to_messages(ir["tracks"]["harmony"], channel=1, bpb=bpb)
     har_msgs += _pedal_messages(pedals, channel=1, bpb=bpb)
     _flush_track(har, har_msgs)
@@ -125,6 +180,7 @@ def render_midi(ir: dict, path: str) -> None:
 
     # bass (no pedal — would muddy the low register)
     bas = _track_with_program("bass", programs["bass"], channel=2)
+    _append_detune(bas, channel=2, cents=detune_cents)
     _flush_track(bas,
                  _events_to_messages(ir["tracks"]["bass"], channel=2, bpb=bpb))
     mid.tracks.append(bas)
