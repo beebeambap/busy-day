@@ -10,7 +10,7 @@ from __future__ import annotations
 from random import Random
 
 VARIATIONS = ["plain", "transpose_step", "retrograde", "augment", "diminish",
-              "ornament", "omit", "echo"]
+              "ornament", "omit", "echo", "octave_lift", "octave_drop"]
 
 
 def _variant_weights(rng: Random) -> list[float]:
@@ -23,6 +23,13 @@ def _variant_weights(rng: Random) -> list[float]:
         0.7 + rng.random() * 0.6,    # ornament (passing tone)
         0.5,                         # omit a note
         0.6,                         # echo (repeat last 2)
+        # Octave displacement of the phrase tail. Spreads the melody's
+        # spectral energy across octaves so consecutive motif statements
+        # don't pile identical peaks at the same frequencies (an
+        # anti-fingerprint measure) while reading as a natural melodic
+        # leap. Bounded to the tail so the line stays singable.
+        0.7,                         # octave_lift  (tail +1 oct)
+        0.5,                         # octave_drop  (tail -1 oct)
     ]
 
 
@@ -77,6 +84,15 @@ def apply_variation(
         degrees += degrees[-n:]
         octs    += octs[-n:]
         rhythm  += [r * 0.75 for r in rhythm[-n:]]
+    elif variant == "octave_lift":
+        # Lift the last 1-2 notes an octave — phrase-ending displacement.
+        n = min(2, len(octs))
+        for i in range(len(octs) - n, len(octs)):
+            octs[i] += 1
+    elif variant == "octave_drop":
+        n = min(2, len(octs))
+        for i in range(len(octs) - n, len(octs)):
+            octs[i] -= 1
 
     return list(zip(degrees, octs, rhythm))
 
