@@ -317,16 +317,17 @@ function makeUprightBass(volume) {
 }
 
 function makeAMPad(volume) {
-  // Attack was 0.6 s — for folk 1-beat notes (750 ms at 80 BPM) that
-  // left the pad barely audible. 0.28 s gives a smooth swell that
-  // actually reaches presence within a single beat. Release extended
-  // to 2.0 s so chords linger gently into the next beat.
+  // Attack 0.28 s gives a smooth swell that reaches presence within a
+  // beat. Release reduced 2.0 → 1.2 s: the old tail bled ~2 s into the
+  // next chord, blurring the harmonic progression ("left-hand ringing").
+  // 1.2 s still lingers gently but lets each chord breathe before the
+  // next one lands.
   return new Tone.PolySynth(Tone.AMSynth, {
     harmonicity: 1.5,
-    envelope:   { attack: 0.28, decay: 0.4, sustain: 0.72, release: 2.0 },
+    envelope:   { attack: 0.28, decay: 0.4, sustain: 0.72, release: 1.2 },
     modulation: { type: "sine" },
     modulationEnvelope: {
-      attack: 0.35, decay: 0.2, sustain: 0.7, release: 1.6,
+      attack: 0.35, decay: 0.2, sustain: 0.7, release: 0.9,
     },
     volume,
   });
@@ -377,10 +378,14 @@ function makeStringPad(volume) {
   return new Tone.PolySynth(Tone.AMSynth, {
     harmonicity: 1.8,
     oscillator: { type: "triangle4" },
-    envelope:   { attack: 0.55, decay: 0.5, sustain: 0.85, release: 2.8 },
+    // Release reduced 2.8 → 1.6 s. The 2.8 s tail was the worst
+    // offender for chord blur on neo_classical/ambient — whole-note
+    // chords overlapped the next bar by nearly 3 s. 1.6 s keeps the
+    // slow-string character without smearing the progression.
+    envelope:   { attack: 0.55, decay: 0.5, sustain: 0.85, release: 1.6 },
     modulation: { type: "sine" },
     modulationEnvelope: {
-      attack: 0.7, decay: 0.4, sustain: 0.8, release: 2.2,
+      attack: 0.7, decay: 0.4, sustain: 0.8, release: 1.3,
     },
     volume,
   });
