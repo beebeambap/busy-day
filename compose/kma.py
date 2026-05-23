@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 import statistics
+import time
 from typing import Any
 
 import requests
@@ -25,6 +26,46 @@ BASE_URL = (
     "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
 )
 BASE_TIMES = [200, 500, 800, 1100, 1400, 1700, 2000, 2300]
+
+# Transient HTTP statuses worth retrying. 429 = rate limit (the cron
+# failure we saw); 5xx = upstream hiccups.
+_RETRY_STATUSES = {429, 500, 502, 503, 504}
+_MAX_RETRIES = 4
+_BACKOFF_BASE = 2.0   # seconds: 2, 4, 8, 16
+
+
+def _get_with_retry(url: str, params: dict, timeout: float) -> requests.Response:
+    """GET with exponential backoff on transient errors (429 / 5xx /
+    connection failures). Honors a Retry-After header when present.
+
+    KMA's public endpoint rate-limits aggressively around the top of
+    the hour (when our 06:00 KST cron and everyone else's jobs fire),
+    so a single 429 used to kill the whole daily compose. Retrying with
+    backoff makes the cron resilient to those bursts."""
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            r = requests.get(url, params=params, timeout=timeout)
+            if r.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES:
+                retry_after = r.headers.get("Retry-After")
+                if retry_after and retry_after.isdigit():
+                    delay = float(retry_after)
+                else:
+                    delay = _BACKOFF_BASE * (2 ** attempt)
+                time.sleep(delay)
+                continue
+            return r
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_exc = exc
+            if attempt < _MAX_RETRIES:
+                time.sleep(_BACKOFF_BASE * (2 ** attempt))
+                continue
+            raise
+    # Exhausted retries on a retryable status — return the last response
+    # so the caller's raise_for_status() surfaces the real error.
+    if last_exc is not None:
+        raise last_exc
+    return r
 
 
 def _pick_base(now_kst: dt.datetime) -> tuple[str, str]:
@@ -162,7 +203,7 @@ def fetch_daily(
             "nx":            nx,
             "ny":            ny,
         }
-        r = requests.get(BASE_URL, params=params, timeout=timeout)
+        r = _get_with_retry(BASE_URL, params, timeout)
         r.raise_for_status()
         body = r.json()
         head = body.get("response", {}).get("header", {})
