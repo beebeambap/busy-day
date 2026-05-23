@@ -366,6 +366,15 @@ def compose_ir(
                     octave_shift=oct_shift + bar_oct_lift,
                     base_octave=melody_octave,
                 )
+                # Fold (don't drop) out-of-range pitches back into a
+                # musical melody window. octave_lift/drop variations +
+                # macro octave + B-climb can stack past the ceiling;
+                # folding keeps every note instead of leaving gaps, and
+                # avoids a shrill top / sub-bass-melody collision.
+                while pitch > 93:
+                    pitch -= 12
+                while pitch < 48:
+                    pitch += 12
                 if 36 <= pitch <= 96:
                     vel = 70 + int(rng.uniform(-6, 6))
                     if section == "OUTRO":
