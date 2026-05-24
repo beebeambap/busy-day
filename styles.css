@@ -374,11 +374,44 @@ body.detail-open { overflow: hidden; }
   margin-top: 2rem;
   display: flex;
   justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 .make-row .make {
   font-size: 13px;
   letter-spacing: 0.04em;
   padding: 0.55rem 1.1rem;
+}
+/* secondary action (range re-render) — quieter than the primary make */
+.make-row .make.secondary {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--line-2);
+}
+.make-row .make.secondary:hover { color: var(--fg); background: #f1ede5; }
+
+/* range re-render modal fields */
+.intent-inner.narrow { max-width: 380px; }
+.range-fields {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0 0.5rem;
+}
+.range-fields label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.range-fields input[type="date"] {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+  color: var(--fg);
 }
 
 .intent-modal {

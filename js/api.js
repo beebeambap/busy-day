@@ -141,7 +141,7 @@ export async function updateSongPin(songId, pinType) {
 // fixes only — notes preserved). Overwrites MIDI + SVG in Storage at the
 // same URLs, so there's no new row to poll: the caller waits eta_sec
 // then re-fetches the MIDI with a cache-bust.
-export async function triggerRerender({ city, date, variant }) {
+export async function triggerRerender({ city, date, variant, to }) {
   const url = `${SUPABASE_URL}/functions/v1/trigger_rerender`;
   const r = await fetch(url, {
     method: "POST",
@@ -150,7 +150,7 @@ export async function triggerRerender({ city, date, variant }) {
       "apikey":         SUPABASE_PUBLISHABLE_KEY,
       "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ city, date, variant }),
+    body: JSON.stringify({ city, date, variant, to }),
   });
   const text = await r.text();
   let body;

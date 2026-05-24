@@ -65,8 +65,29 @@
 
     <div class="make-row">
       <button id="make-btn" type="button" class="make">+ 오늘 곡 더 만들기</button>
+      <button id="rerender-range-btn" type="button" class="make secondary">↻ 범위 재렌더</button>
     </div>
   </main>
+
+  <!-- ── range re-render modal ───────────────────────────────── -->
+  <aside id="rerender-modal" class="intent-modal" hidden aria-hidden="true">
+    <div class="intent-inner narrow">
+      <button id="rerender-modal-close" class="close" aria-label="닫기">✕</button>
+      <h3>범위 재렌더</h3>
+      <p class="muted small">
+        저장된 IR에서 다시 굽습니다 (음표 보존, 최신 렌더 설정 적용).
+        날짜 범위 내 모든 변형이 재렌더됩니다.
+      </p>
+      <div class="range-fields">
+        <label>시작<input id="rerender-from" type="date"></label>
+        <label>끝<input id="rerender-to" type="date"></label>
+      </div>
+      <p id="rerender-range-status" class="muted small">—</p>
+      <div class="modal-actions">
+        <button id="rerender-range-run" type="button" class="primary">재렌더 시작</button>
+      </div>
+    </div>
+  </aside>
 
   <!-- ── intent picker ───────────────────────────────────────── -->
   <aside id="intent" class="intent-modal" hidden aria-hidden="true">
@@ -164,7 +185,12 @@
         <button id="rerender-btn" type="button" class="rerender-btn">
           <span class="rr-icon" aria-hidden="true">&#x21bb;</span>
           <span class="rr-label">재렌더</span>
-          <span class="rr-sub muted small">최신 렌더 설정으로 다시 굽기</span>
+          <span class="rr-sub muted small">이 곡만</span>
+        </button>
+        <button id="rerender-day-btn" type="button" class="rerender-btn">
+          <span class="rr-icon" aria-hidden="true">&#x21bb;</span>
+          <span class="rr-label">이 날 전체</span>
+          <span class="rr-sub muted small">모든 변형</span>
         </button>
       </div>
     </div>
