@@ -128,6 +128,15 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:
         pass
 
+    # `rerender` re-renders published songs from their stored IR so
+    # render-side fixes (acoustic salt, channel balance, …) reach
+    # already-released tracks without changing a single note.
+    try:
+        from .rerender import register as register_rerender
+        register_rerender(sub)
+    except Exception:
+        pass
+
     args = p.parse_args(argv)
     return args.func(args)
 
