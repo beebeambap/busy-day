@@ -1,7 +1,13 @@
 import { bindGate } from "./auth.js";
 import { CalendarView } from "./calendar.js";
 import { DetailPanel } from "./player.js";
-import { findVariant, fetchVariants, triggerCompose, triggerTape } from "./api.js";
+import {
+  findVariant,
+  fetchVariants,
+  triggerCompose,
+  triggerTape,
+  triggerRerender,
+} from "./api.js";
 import { DEFAULT_CITY, DEFAULT_CITY_NAME } from "./config.js";
 import { TAPE_LABELS } from "./tapes.js";
 
@@ -231,10 +237,39 @@ function boot() {
     }
   }
 
+  // Re-render trigger: re-bakes a published song's audio from its stored
+  // IR with the latest render settings (acoustic salt, channel balance).
+  // No new row is created — the same Storage files are overwritten — so
+  // we just dispatch, wait the ETA, and return true so the DetailPanel
+  // can reload the (same-URL) MIDI with a cache-bust.
+  async function runRerender({ city, date, variant }) {
+    const eta = 40;
+    progress.show(eta);
+    try {
+      const r = await triggerRerender({ city, date, variant });
+      const realEta = r.eta_sec || eta;
+      const start = Date.now();
+      await new Promise((resolve) => {
+        const iv = setInterval(() => {
+          const elapsed = (Date.now() - start) / 1000;
+          progress.tick(elapsed, realEta);
+          if (elapsed >= realEta) { clearInterval(iv); resolve(); }
+        }, 1000);
+      });
+      progress.hide();
+      return true;
+    } catch (err) {
+      console.error(err);
+      progress.fail(`재렌더 실패: ${err.message || err}`);
+      return false;
+    }
+  }
+
   const detail = new DetailPanel({
     root:          $("detail"),
     onTapeTrigger: runTapeTrigger,
     onPinChange:   () => cal.render(),
+    onRerender:    runRerender,
   });
 
   const cal = new CalendarView({

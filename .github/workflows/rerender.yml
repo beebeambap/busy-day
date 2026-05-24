@@ -1,0 +1,70 @@
+name: rerender
+
+# Triggered by the trigger_rerender Edge Function (workflow_dispatch).
+# Re-renders an already-published song from its stored IR, applying the
+# current render.py (acoustic salt, channel balance, …) WITHOUT
+# re-composing — every note is preserved. Overwrites the song's MIDI +
+# SVG in Storage in place.
+#
+# No KMA fetch, no compose step.
+
+on:
+  workflow_dispatch:
+    inputs:
+      city:
+        description: "city id (e.g. seoul)"
+        type: string
+        required: true
+      date:
+        description: "date YYYY-MM-DD (single song), or range start with 'to'"
+        type: string
+        required: true
+      to:
+        description: "range end YYYY-MM-DD (optional; defaults to single date)"
+        type: string
+        required: false
+      variant:
+        description: "variant id (optional; e.g. auto). Empty = all variants"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  rerender:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mido verovio requests
+
+      - name: Re-render from stored IR
+        env:
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_STORAGE_BUCKET:   busy-day-archive
+          CITY:    ${{ github.event.inputs.city }}
+          DATE:    ${{ github.event.inputs.date }}
+          TO:      ${{ github.event.inputs.to }}
+          VARIANT: ${{ github.event.inputs.variant }}
+        run: |
+          ARGS=(--city "$CITY")
+          if [ -n "$TO" ]; then
+            ARGS+=(--from "$DATE" --to "$TO")
+          else
+            ARGS+=(--date "$DATE")
+          fi
+          if [ -n "$VARIANT" ]; then
+            ARGS+=(--variant "$VARIANT")
+          fi
+          python -m compose rerender "${ARGS[@]}"

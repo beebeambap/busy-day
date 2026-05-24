@@ -1054,7 +1054,8 @@ function variantLabel(song, allVariants = null) {
 }
 
 export class DetailPanel {
-  constructor({ root, onTapeTrigger = null, onPinChange = null }) {
+  constructor({ root, onTapeTrigger = null, onPinChange = null,
+               onRerender = null }) {
     this.root        = root;
     this.dateEl      = root.querySelector("#detail-date");
     this.metaEl      = root.querySelector("#detail-meta");
@@ -1076,6 +1077,7 @@ export class DetailPanel {
     this.memoStatus  = root.querySelector("#detail-memo-status");
     this.pinLegendaryBtn = root.querySelector("#pin-legendary-btn");
     this.pinWorstBtn     = root.querySelector("#pin-worst-btn");
+    this.rerenderBtn     = root.querySelector("#rerender-btn");
 
     // Tape trigger lives in main.js so it can share the progress popup
     // and calendar refresh with the intent flow. We just call back when
@@ -1083,6 +1085,12 @@ export class DetailPanel {
     this.onTapeTrigger = onTapeTrigger;
     // Calendar re-render after pin change (wired in main.js).
     this.onPinChange = onPinChange;
+    // Re-render trigger (wired in main.js): re-bakes the song's audio
+    // from its stored IR with the latest render settings.
+    this.onRerender = onRerender;
+    // Cache-bust token appended to MIDI/SVG URLs so a freshly re-rendered
+    // file is re-fetched instead of served from browser cache.
+    this._cacheBust = "";
 
     this.midi = null;
     this.duration = 0;
@@ -1117,6 +1125,28 @@ export class DetailPanel {
     }
     if (this.pinWorstBtn) {
       this.pinWorstBtn.addEventListener("click", () => this._onPinClick("worst"));
+    }
+    if (this.rerenderBtn) {
+      this.rerenderBtn.addEventListener("click", () => this._onRerenderClick());
+    }
+  }
+
+  async _onRerenderClick() {
+    if (!this.onRerender || !this.song) return;
+    const { city_id, date, variant_id } = this.song;
+    this.rerenderBtn.disabled = true;
+    try {
+      // main.js runs the dispatch + progress + waits the ETA, then
+      // resolves so we can reload the audio with a fresh cache-bust.
+      const ok = await this.onRerender({
+        city: city_id, date, variant: variant_id,
+      });
+      if (ok && this.song) {
+        this._cacheBust = `v=${Date.now()}`;
+        await this.setVariant(this.variant || "short");
+      }
+    } finally {
+      if (this.rerenderBtn) this.rerenderBtn.disabled = false;
     }
   }
 
@@ -1195,6 +1225,7 @@ export class DetailPanel {
 
   open(song, variants = null) {
     this._flushMemoSave();           // commit any unsaved typing
+    this._cacheBust = "";            // fresh song → drop any stale bust
     this.song = song;
     this.variants = variants && variants.length ? variants : [song];
     this.dateEl.textContent = formatDate(song.date);
@@ -1248,11 +1279,16 @@ export class DetailPanel {
     }
     this.variant = v;
     const key = v === "long" ? "mid_long" : "mid_short";
-    const url = publicUrl(this.song?.paths?.[key]);
+    let url = publicUrl(this.song?.paths?.[key]);
     if (!url) {
       this.statusEl.textContent = "MIDI 파일이 없습니다";
       this.playBtn.disabled = true;
       return;
+    }
+    // After a re-render the URL is unchanged but the file content
+    // changed; the cache-bust forces a fresh fetch.
+    if (this._cacheBust) {
+      url += (url.includes("?") ? "&" : "?") + this._cacheBust;
     }
     this.statusEl.textContent = "MIDI 로딩 중…";
     this.playBtn.disabled = true;

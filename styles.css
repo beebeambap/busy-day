@@ -284,6 +284,29 @@ body.detail-open { overflow: hidden; }
   text-align: right;
 }
 
+/* ── re-render button (maintenance: re-bake audio from stored IR) ── */
+.rerender-row { margin: 0.75rem 0 0; }
+.rerender-btn {
+  display: inline-grid;
+  grid-template-columns: max-content max-content max-content;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.rerender-btn:hover:not(:disabled) {
+  background: rgba(20, 18, 14, 0.04);
+  color: var(--fg);
+}
+.rerender-btn:disabled { opacity: 0.45; cursor: progress; }
+.rerender-btn .rr-icon  { font-size: 15px; line-height: 1; }
+.rerender-btn .rr-label { font-size: 13px; letter-spacing: 0.02em; }
+.rerender-btn .rr-sub   { font-size: 11px; }
+
 .score {
   margin: 1rem 0 1.25rem;
   background: #fff;
