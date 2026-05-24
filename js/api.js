@@ -137,6 +137,28 @@ export async function updateSongPin(songId, pinType) {
   return (data && data[0]) || null;
 }
 
+// Re-render a published song in place from its stored IR (render-side
+// fixes only — notes preserved). Overwrites MIDI + SVG in Storage at the
+// same URLs, so there's no new row to poll: the caller waits eta_sec
+// then re-fetches the MIDI with a cache-bust.
+export async function triggerRerender({ city, date, variant }) {
+  const url = `${SUPABASE_URL}/functions/v1/trigger_rerender`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "apikey":         SUPABASE_PUBLISHABLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ city, date, variant }),
+  });
+  const text = await r.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { error: text }; }
+  if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+  return body;          // { ok, eta_sec }
+}
+
 export async function recordPlay(songId, variant) {
   await supabase.from("plays").insert({
     song_id: songId,
