@@ -69,13 +69,25 @@ GM_PROGRAMS = {
     "folk":          {"melody": 0,  "harmony": 24, "bass": 32},  # piano + nylon + ac. bass
 }
 
+# Harmony GM programs that are thick, continuous ensembles/pads. At
+# equal velocity they sit as a wall under the melody (the "strings bury
+# the piano" problem). We scale their harmony velocity down so the lead
+# cuts through. Ranges: 48-55 strings/ensemble/choir, 88-95 synth pads.
+_THICK_HARMONY = set(range(48, 56)) | set(range(88, 96))
+_THICK_HARMONY_VEL_SCALE = 0.66
+
 
 def _events_to_messages(
     events: list[dict],
     channel: int,
     bpb: float,
+    vel_scale: float = 1.0,
 ) -> list[tuple[int, mido.Message]]:
-    """Returns list of (absolute_tick, msg) for note_on + note_off."""
+    """Returns list of (absolute_tick, msg) for note_on + note_off.
+
+    vel_scale lets the caller attenuate a whole track — used to pull
+    thick continuous harmony patches (strings/pads) down so they don't
+    bury the melody (see _THICK_HARMONY)."""
     out = []
     for ev in events:
         start = (ev["bar"] * bpb + ev["start_beat"]) * TICKS_PER_BEAT
@@ -84,7 +96,7 @@ def _events_to_messages(
             pitches = [ev["pitch"]]
         else:
             pitches = ev["pitches"]
-        vel = max(1, min(127, int(ev.get("vel", 64))))
+        vel = max(1, min(127, int(round(ev.get("vel", 64) * vel_scale))))
         for p in pitches:
             out.append((int(start),
                         mido.Message("note_on", channel=channel,
@@ -170,11 +182,18 @@ def render_midi(ir: dict, path: str) -> None:
     _flush_track(mel, mel_msgs)
     mid.tracks.append(mel)
 
-    # harmony (also pedaled to keep pad legato across chord changes)
+    # harmony — NO sustain pedal. The pedal belongs on the piano
+    # (melody) for legato; on the harmony channel it compounds with
+    # already-sustained pad/string patches and piles overlapping chords
+    # into a continuous wall that buries the melody. Each harmony note's
+    # own duration provides enough legato. Thick patches also get a
+    # velocity cut so they sit under the lead.
     har = _track_with_program("harmony", programs["harmony"], channel=1)
     _append_detune(har, channel=1, cents=detune_cents)
-    har_msgs = _events_to_messages(ir["tracks"]["harmony"], channel=1, bpb=bpb)
-    har_msgs += _pedal_messages(pedals, channel=1, bpb=bpb)
+    har_scale = (_THICK_HARMONY_VEL_SCALE
+                 if programs["harmony"] in _THICK_HARMONY else 1.0)
+    har_msgs = _events_to_messages(ir["tracks"]["harmony"], channel=1,
+                                   bpb=bpb, vel_scale=har_scale)
     _flush_track(har, har_msgs)
     mid.tracks.append(har)
 
