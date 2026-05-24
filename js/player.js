@@ -1078,6 +1078,7 @@ export class DetailPanel {
     this.pinLegendaryBtn = root.querySelector("#pin-legendary-btn");
     this.pinWorstBtn     = root.querySelector("#pin-worst-btn");
     this.rerenderBtn     = root.querySelector("#rerender-btn");
+    this.rerenderDayBtn  = root.querySelector("#rerender-day-btn");
 
     // Tape trigger lives in main.js so it can share the progress popup
     // and calendar refresh with the intent flow. We just call back when
@@ -1127,26 +1128,32 @@ export class DetailPanel {
       this.pinWorstBtn.addEventListener("click", () => this._onPinClick("worst"));
     }
     if (this.rerenderBtn) {
-      this.rerenderBtn.addEventListener("click", () => this._onRerenderClick());
+      this.rerenderBtn.addEventListener("click", () => this._onRerenderClick(false));
+    }
+    if (this.rerenderDayBtn) {
+      this.rerenderDayBtn.addEventListener("click", () => this._onRerenderClick(true));
     }
   }
 
-  async _onRerenderClick() {
+  async _onRerenderClick(wholeDay) {
     if (!this.onRerender || !this.song) return;
     const { city_id, date, variant_id } = this.song;
-    this.rerenderBtn.disabled = true;
+    const btns = [this.rerenderBtn, this.rerenderDayBtn].filter(Boolean);
+    btns.forEach((b) => { b.disabled = true; });
     try {
-      // main.js runs the dispatch + progress + waits the ETA, then
-      // resolves so we can reload the audio with a fresh cache-bust.
+      // wholeDay → omit variant so the workflow re-renders every variant
+      // of the date; otherwise just this variant. main.js dispatches +
+      // shows progress + waits the ETA, then resolves true.
       const ok = await this.onRerender({
-        city: city_id, date, variant: variant_id,
+        city: city_id, date,
+        variant: wholeDay ? "" : variant_id,
       });
       if (ok && this.song) {
         this._cacheBust = `v=${Date.now()}`;
         await this.setVariant(this.variant || "short");
       }
     } finally {
-      if (this.rerenderBtn) this.rerenderBtn.disabled = false;
+      btns.forEach((b) => { b.disabled = false; });
     }
   }
 

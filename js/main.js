@@ -242,11 +242,11 @@ function boot() {
   // No new row is created — the same Storage files are overwritten — so
   // we just dispatch, wait the ETA, and return true so the DetailPanel
   // can reload the (same-URL) MIDI with a cache-bust.
-  async function runRerender({ city, date, variant }) {
-    const eta = 40;
+  async function runRerender({ city, date, variant, to }) {
+    const eta = to ? 90 : 40;
     progress.show(eta);
     try {
-      const r = await triggerRerender({ city, date, variant });
+      const r = await triggerRerender({ city, date, variant, to });
       const realEta = r.eta_sec || eta;
       const start = Date.now();
       await new Promise((resolve) => {
@@ -318,6 +318,45 @@ function boot() {
   });
 
   $("make-btn").addEventListener("click", () => intentModal.open());
+
+  // ── range re-render modal ──────────────────────────────────────
+  const rrModal  = $("rerender-modal");
+  const rrFrom   = $("rerender-from");
+  const rrTo     = $("rerender-to");
+  const rrStatus = $("rerender-range-status");
+  const rrRun    = $("rerender-range-run");
+
+  function openRrModal() {
+    const today = todayKST();
+    if (!rrFrom.value) rrFrom.value = today;
+    if (!rrTo.value)   rrTo.value   = today;
+    rrStatus.textContent = "—";
+    rrModal.hidden = false;
+    rrModal.setAttribute("aria-hidden", "false");
+  }
+  function closeRrModal() {
+    rrModal.hidden = true;
+    rrModal.setAttribute("aria-hidden", "true");
+  }
+
+  $("rerender-range-btn").addEventListener("click", openRrModal);
+  $("rerender-modal-close").addEventListener("click", closeRrModal);
+  rrModal.addEventListener("click", (e) => { if (e.target === rrModal) closeRrModal(); });
+
+  rrRun.addEventListener("click", async () => {
+    const from = rrFrom.value;
+    const to   = rrTo.value;
+    if (!from || !to) { rrStatus.textContent = "시작·끝 날짜를 입력하세요"; return; }
+    if (from > to)    { rrStatus.textContent = "시작이 끝보다 늦습니다"; return; }
+    rrRun.disabled = true;
+    rrStatus.textContent = "디스패치 중…";
+    closeRrModal();
+    // variant omitted → every variant in the range. date = range start,
+    // to = range end. runRerender shares the progress popup.
+    const ok = await runRerender({ city: DEFAULT_CITY, date: from, to, variant: "" });
+    rrRun.disabled = false;
+    if (ok) await cal.render();
+  });
 
   $("app").hidden = false;
   document.body.dataset.state = "ready";
