@@ -334,7 +334,20 @@ def transform_ir(
     duration_beats = total_bars * bpb + ring_out_beats
     duration_sec = duration_beats * 60.0 / new_bpm
 
-    return {
+    # Apply preset.melody_instrument to the output IR by setting
+    # ir["melody_gm_program"] — render_midi reads this top-level field
+    # to override the genre's default melody program. Without this the
+    # preset's instrument was only metadata and the rendered MIDI used
+    # the source's original instrument (style/tape preset's melody
+    # timbre never took effect audibly).
+    melody_gm_program = None
+    if preset.melody_instrument:
+        from ..instruments import get as _get_instrument
+        inst = _get_instrument(preset.melody_instrument)
+        if inst is not None:
+            melody_gm_program = inst.gm_program
+
+    out = {
         "meta": dict(original_ir["meta"]),
         "spec": {
             "key_root": key,
@@ -344,6 +357,9 @@ def transform_ir(
             "meter": meter,
             "motif_id": spec_src.get("motif_id"),
             "voicing": voicing,
+            # Preserve sub_style on the output so downstream consumers
+            # (e.g., another arrangement of an arrangement) can read it.
+            "sub_style": sub_style,
         },
         "features": dict(original_ir.get("features", {})),
         "form": list(form),
@@ -372,3 +388,6 @@ def transform_ir(
             "melody_instrument": preset.melody_instrument,
         },
     }
+    if melody_gm_program is not None:
+        out["melody_gm_program"] = melody_gm_program
+    return out
