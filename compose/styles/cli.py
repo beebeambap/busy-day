@@ -111,6 +111,15 @@ def run_style_arrangement(sb: Supabase, source_id: str,
             f"source song {source_id} has no IR paths (paths={paths_src})"
         )
 
+    # Download source IR EARLY (small JSON read) so we can use the
+    # source's actual sub_style for the rule's conflict-avoidance.
+    # The songs table doesn't carry sub_style — it lives only in the IR
+    # spec. Without this, choose_for_source treats every source as
+    # sub_style=None and may pick a preset whose sub_style matches the
+    # source's actual sub_style, producing a nearly-identical arrangement.
+    ir_short_src = json.loads(sb.get_file(paths_src["ir_short"]).decode("utf-8"))
+    source_sub_style = ir_short_src.get("spec", {}).get("sub_style")
+
     if style:
         preset = STYLE_PRESETS.get(style)
         if preset is None:
@@ -125,8 +134,9 @@ def run_style_arrangement(sb: Supabase, source_id: str,
             )
     else:
         pseudo_ir = {
-            "spec": {"genre": src["genre"], "sub_style": None},
-            "features": src.get("features") or {},
+            "spec": {"genre": src["genre"], "sub_style": source_sub_style},
+            "features": (src.get("features")
+                         or ir_short_src.get("features") or {}),
         }
         preset = choose_for_source(pseudo_ir)
         if preset is None:
@@ -147,8 +157,7 @@ def run_style_arrangement(sb: Supabase, source_id: str,
     date    = src["date"]
     variant_id = variant or f"style-{preset.id}-{_kst_hhmm()}"
 
-    # ── Download source IRs ───────────────────────────────────────
-    ir_short_src = json.loads(sb.get_file(paths_src["ir_short"]).decode("utf-8"))
+    # ── Download long IR (short already loaded above for sub_style read)
     ir_long_src  = json.loads(sb.get_file(paths_src["ir_long"]).decode("utf-8"))
 
     # ── Transform (seeded) ────────────────────────────────────────
