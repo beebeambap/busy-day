@@ -50,7 +50,11 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="bossa_nova",
         sub_style="basica",
         voicing="seventh",
+        # Brighter, upbeat Astrud-style bossa — more energy than source.
+        bpm_multiplier=1.05,
         melody_instrument="nylon",
+        velocity_profile={"melody": (62, 30), "harmony": (52, 22),
+                          "bass": (58, 22)},
     ),
     "bossa_jazz": StylePreset(
         id="bossa_jazz",
@@ -60,10 +64,13 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="bossa_nova",
         sub_style="jazz",
         voicing="ninth",
-        bpm_multiplier=0.95,
+        # Slower, swung, behind-beat — Jobim's later ballad jazz feel.
+        bpm_multiplier=0.85,                    # was 0.95
         melody_instrument="rhodes",
-        velocity_profile={"melody": (54, 26), "harmony": (44, 18),
-                          "bass": (52, 18)},
+        velocity_profile={"melody": (50, 24), "harmony": (40, 16),
+                          "bass": (48, 16)},   # quieter than source
+        swing_ratio=1.30,                       # subtle bossa-jazz swing
+        groove_delay_ms=12.0,                   # gentle behind-beat
     ),
 
     # ── folk ────────────────────────────────────────────────────────
@@ -75,7 +82,11 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="folk",
         sub_style="boom_chick",
         voicing="triad",
+        # More energetic — Tom Petty / Americana drive.
+        bpm_multiplier=1.05,
         melody_instrument="nylon",
+        velocity_profile={"melody": (64, 30), "harmony": (54, 24),
+                          "bass": (60, 22)},
     ),
     "folk_celtic": StylePreset(
         id="folk_celtic",
@@ -85,8 +96,11 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="folk",
         sub_style="celtic",
         voicing="open_fifth",
-        bpm_multiplier=0.92,
+        # Significantly slower for the drone/lament feel.
+        bpm_multiplier=0.82,                    # was 0.92
         melody_instrument="harp",
+        velocity_profile={"melody": (48, 22), "harmony": (38, 16),
+                          "bass": (46, 16)},
     ),
 
     # ── jazz_ballad ─────────────────────────────────────────────────
@@ -98,7 +112,11 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="jazz_ballad",
         sub_style="walking",
         voicing="seventh",
+        bpm_multiplier=1.05,                    # slight energy push
         melody_instrument="piano",
+        velocity_profile={"melody": (58, 28), "harmony": (48, 20),
+                          "bass": (56, 20)},
+        swing_ratio=1.25,                       # light classic-jazz swing
     ),
     "jazz_rubato": StylePreset(
         id="jazz_rubato",
@@ -108,23 +126,28 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="jazz_ballad",
         sub_style="rubato",
         voicing="ninth",
-        bpm_multiplier=0.85,
+        # Truly rubato — drop another 10% from before for pause feel.
+        bpm_multiplier=0.75,                    # was 0.85
         melody_instrument="piano",
-        velocity_profile={"melody": (46, 24), "harmony": (38, 16),
-                          "bass": (44, 16)},
+        velocity_profile={"melody": (44, 22), "harmony": (36, 14),
+                          "bass": (42, 14)},   # very soft
+        groove_delay_ms=22.0,                   # loose behind-beat
     ),
 
-    # ── ambient (Phase 1a 신규) ─────────────────────────────────────
+    # ── ambient ─────────────────────────────────────────────────────
     "amb_pad": StylePreset(
         id="amb_pad",
         label_ko="패드",
         icon="☁",
         source_genre="ambient",
         genre_override="ambient",
-        # No registered _SUB_PACKS for this — falls back to ambient genre
-        # defaults (the "current" ambient sound).
-        sub_style="amb_pad_default",
+        sub_style="amb_pad_default",            # → genre fallback cells
         voicing="triad",
+        # Standard pad but with a small lift in dynamics so it doesn't
+        # feel identical to a sleepier source.
+        bpm_multiplier=1.0,
+        velocity_profile={"melody": (58, 26), "harmony": (48, 22),
+                          "bass": (54, 20)},
     ),
     "amb_drone": StylePreset(
         id="amb_drone",
@@ -134,20 +157,24 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="ambient",
         sub_style="drone",
         voicing="open_fifth",
-        bpm_multiplier=0.88,
-        velocity_profile={"melody": (44, 22), "harmony": (36, 16),
-                          "bass": (40, 14)},
+        # Deep slowdown for the contemplative drone.
+        bpm_multiplier=0.78,                    # was 0.88
+        velocity_profile={"melody": (42, 20), "harmony": (34, 14),
+                          "bass": (38, 12)},
     ),
 
-    # ── neo_classical (Phase 1a 신규) ───────────────────────────────
+    # ── neo_classical ───────────────────────────────────────────────
     "neo_alberti": StylePreset(
         id="neo_alberti",
         label_ko="알베르티",
         icon="🎹",
         source_genre="neo_classical",
         genre_override="neo_classical",
-        sub_style="neo_alberti_default",   # falls back to genre defaults
+        sub_style="neo_alberti_default",
         voicing="triad",
+        bpm_multiplier=1.05,                    # crisper alberti runs
+        velocity_profile={"melody": (62, 30), "harmony": (52, 22),
+                          "bass": (58, 22)},
     ),
     "neo_pedal": StylePreset(
         id="neo_pedal",
@@ -157,18 +184,25 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="neo_classical",
         sub_style="pedal",
         voicing="seventh",
-        bpm_multiplier=0.95,
+        # Deeper slowdown for the held-pedal contemplation.
+        bpm_multiplier=0.82,                    # was 0.95
+        velocity_profile={"melody": (50, 24), "harmony": (42, 18),
+                          "bass": (46, 16)},
     ),
 
-    # ── lo_fi (Phase 1a 신규) ───────────────────────────────────────
+    # ── lo_fi ───────────────────────────────────────────────────────
     "lofi_chill": StylePreset(
         id="lofi_chill",
         label_ko="칠",
         icon="🌙",
         source_genre="lo_fi",
         genre_override="lo_fi",
-        sub_style="lofi_chill_default",    # falls back to genre defaults
+        sub_style="lofi_chill_default",
         voicing="triad",
+        bpm_multiplier=0.95,
+        velocity_profile={"melody": (54, 24), "harmony": (44, 18),
+                          "bass": (50, 18)},
+        groove_delay_ms=10.0,                   # gentle lazy
     ),
     "lofi_boombap": StylePreset(
         id="lofi_boombap",
@@ -178,7 +212,12 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         genre_override="lo_fi",
         sub_style="boombap",
         voicing="seventh",
-        bpm_multiplier=0.95,
+        # Heavier boom-bap shell, J Dilla micro-syncopation.
+        bpm_multiplier=0.85,                    # was 0.95
+        velocity_profile={"melody": (52, 24), "harmony": (42, 16),
+                          "bass": (58, 22)},   # bass louder (sub-bass)
+        swing_ratio=1.20,                       # light Dilla shuffle
+        groove_delay_ms=18.0,                   # behind-beat
     ),
 }
 
