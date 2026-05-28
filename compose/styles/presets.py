@@ -242,31 +242,41 @@ def applicable_for_genre(genre: str) -> list[StylePreset]:
     return [p for p in STYLE_PRESETS.values() if p.source_genre == genre]
 
 
+def _effective_sub_style(s: Optional[str]) -> Optional[str]:
+    """Normalize the '_default' sentinel and None to a single value so
+    a 'default-preset arrangement of a source already using genre
+    defaults' is detected as a no-op conflict (and skipped)."""
+    if not s:
+        return None
+    if s.endswith("_default"):
+        return None
+    return s
+
+
 def choose_for_source(source_ir: dict) -> Optional[StylePreset]:
     """Pick the best style preset for a source IR.
 
     Walks the genre's rule output (ordered preferences) and returns the
-    first preset whose sub_style differs from the source's current
-    sub_style. If the source is in a genre we don't have rules for,
-    returns None.
+    first preset whose effective sub_style differs from the source's
+    current sub_style. Effective = '_default' sentinel collapsed to None
+    (so an ambient source with sub_style=None never gets the amb_pad
+    preset, which would just regenerate the same default sound).
 
-    The features used come from the source IR's stored `features` dict,
-    so the decision is fully determined by the source song — no
-    re-fetching weather, no user input.
+    Features come from the source IR's stored `features` dict — fully
+    determined by the source song, no re-fetching weather or user input.
+    Returns None if the source's genre has no rule defined.
     """
     genre = source_ir.get("spec", {}).get("genre")
     if genre not in _RULES:
         return None
     features = source_ir.get("features") or {}
-    current_sub = source_ir.get("spec", {}).get("sub_style")
+    current = _effective_sub_style(source_ir.get("spec", {}).get("sub_style"))
     ranked = _RULES[genre](features)
     for pid in ranked:
         preset = STYLE_PRESETS.get(pid)
         if preset is None:
             continue
-        # Skip presets that would produce a trivial "same as source"
-        # arrangement. Phase 1a: 2-option list → always finds a diff.
-        if preset.sub_style != current_sub:
+        if _effective_sub_style(preset.sub_style) != current:
             return preset
-    # All conflict (shouldn't happen with 2+ options) — fallback to last.
+    # All conflict (shouldn't happen with 2+ options of differing kind).
     return STYLE_PRESETS.get(ranked[-1]) if ranked else None
