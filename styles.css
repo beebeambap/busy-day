@@ -598,28 +598,29 @@ body.detail-open { overflow: hidden; }
   border-radius: 0;
 }
 
-/* ── variant chips inside detail head ────────────────────── */
+/* ── variant chips inside detail head (source-grouped) ──────
+   Each row in #detail-variants is one ORIGINAL + its ARRANGEMENT
+   children. The header line names the source family; the chip row
+   below is [원곡] + [편곡 children…]. Mirrors the data model
+   (source_song_id parent-child) visually so listeners can scan a
+   busy day without parsing chip labels. */
 .variant-chips {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.7rem;
   margin: 0.75rem 0 0.25rem;
 }
-/* Each group ("원곡" or "편곡") has a tiny label on the left and a
-   flex row of chip buttons. On mobile the label sits above the row. */
-.variant-group {
-  display: grid;
-  grid-template-columns: 38px 1fr;
-  align-items: baseline;
-  gap: 0.5rem;
+.variant-source-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
-.variant-group-label {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.variant-source-header {
+  font-size: 11px;
+  letter-spacing: 0.04em;
   color: var(--muted, #8a8071);
-  padding-top: 0.3rem;
 }
+.variant-source-header.muted { opacity: 0.7; }
 .variant-row {
   display: flex;
   flex-wrap: wrap;
@@ -641,27 +642,10 @@ body.detail-open { overflow: hidden; }
 }
 .variant-chips button:hover:not(.active) { background: #f1ede5; }
 
-/* Tape-child badges inside an original chip — small icons that mark
-   which weather tapes have been derived from this song. Purely
-   informational (no click handler); clicking the parent chip behaves
-   as usual. */
-.tape-children {
-  display: inline-flex;
-  gap: 0.1rem;
-  margin-left: 0.4rem;
-  font-size: 10px;
-  opacity: 0.78;
-  line-height: 1;
-  vertical-align: baseline;
-}
-.tape-child-icon { line-height: 1; }
-
-/* Source-chip indicators for parent-child relationships:
-   - .source-hover: temporary ring while user hovers/focuses a tape
-     chip (desktop nice-to-have)
-   - .is-source-of-active: persistent ring on the original chip when
-     the currently-active variant is a tape derived from it. Works
-     on mobile too since it's tied to selection, not pointer state. */
+/* Parent-child indicators (kept from prior layout):
+   - .source-hover: temporary ring while hovering/focusing a tape chip
+   - .is-source-of-active: persistent ring on the parent chip when an
+     arrangement child is the active variant */
 .variant-chips button.source-hover,
 .variant-chips button.is-source-of-active {
   outline: 1.5px solid var(--fg);
@@ -886,14 +870,11 @@ main, .calendar, .grid { max-width: 100%; min-width: 0; }
     padding: 0.7rem;
   }
 
-  /* variant chips wrap nicely. On narrow screens the group label
-     stacks above the row instead of sitting beside it. */
-  .variant-chips { gap: 0.35rem; }
-  .variant-group {
-    grid-template-columns: 1fr;
-    gap: 0.15rem;
-  }
-  .variant-group-label { padding-top: 0; }
+  /* Variant chips on narrow screens: tighter spacing, header stays
+     above its row (source-grouped layout is already column-stacked). */
+  .variant-chips { gap: 0.5rem; }
+  .variant-source-group { gap: 0.25rem; }
+  .variant-source-header { font-size: 10px; }
   .variant-row { gap: 0.3rem; }
   .variant-chips button {
     font-size: 10px;
