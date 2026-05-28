@@ -61,6 +61,7 @@ def _rebuild_harmony_bar(
     voicing_spread: str,
     bpb: float,
     rng: Random,
+    sub_style: str | None = None,
 ) -> tuple[list[dict], float]:
     """Build harmony events for a single bar. Returns (events, ring_out_beats)."""
     full_chord = chord_pitches(
@@ -84,7 +85,7 @@ def _rebuild_harmony_bar(
 
     har_base_vel = 56 + int(rng.uniform(-3, 3))
     for off, dur, kind, vel_mult in harmony_pattern_for(
-        genre, meter, section, rng,
+        genre, meter, section, rng, sub_style=sub_style,
     ):
         pitches = chord_subset(full_chord, kind)
         if not pitches:
@@ -116,6 +117,7 @@ def _rebuild_bass_bar(
     bpb: float,
     ring_out: float,
     rng: Random,
+    sub_style: str | None = None,
 ) -> list[dict]:
     events: list[dict] = []
     if is_final:
@@ -130,7 +132,8 @@ def _rebuild_bass_bar(
         })
         return events
 
-    for off, dur, kind in bass_pattern_for(genre, meter, section, rng):
+    for off, dur, kind in bass_pattern_for(genre, meter, section, rng,
+                                            sub_style=sub_style):
         pitch = _bass_pitch(degree_to_midi, key, mode, chord_root, kind)
         if not (24 <= pitch <= 60):
             continue
@@ -158,6 +161,7 @@ def _rebuild_percussion_bar(
     meter: str,
     genre: str,
     rng: Random,
+    sub_style: str | None = None,
 ) -> list[dict]:
     if is_final or is_first_intro_bar:
         return []
@@ -167,7 +171,8 @@ def _rebuild_percussion_bar(
         fade = 0.55
     elif section == "OUTRO":
         fade = 0.6
-    for off, kind, vel_mult in percussion_pattern_for(genre, meter, section, rng):
+    for off, kind, vel_mult in percussion_pattern_for(
+            genre, meter, section, rng, sub_style=sub_style):
         vel = int(round(70 * vel_mult * fade + rng.uniform(-2, 2)))
         events.append({
             "bar": bar_idx,
@@ -201,6 +206,16 @@ def transform_ir(
     new_genre = preset.genre_override
     voicing   = preset.voicing
     voicing_spread = original_ir.get("voicing_spread", "default")
+    # Style presets carry a sub_style (drives comping picker → cell pack).
+    # Tape presets don't define this attribute → falls back to None →
+    # comping picker uses genre defaults (existing tape behavior unchanged).
+    sub_style = getattr(preset, "sub_style", None)
+    # The "default" style presets use sentinel sub_style ids ending in
+    # "_default" to indicate "fall back to genre default cells". Normalize
+    # to None so comping's _resolve_cells lookup doesn't try to find a
+    # registered pack that doesn't exist.
+    if sub_style and sub_style.endswith("_default"):
+        sub_style = None
 
     bars_meta = original_ir["bars"]
     total_bars = len(bars_meta)
@@ -225,7 +240,7 @@ def transform_ir(
             chord_for_harmony=chord_for_harmony, is_final=is_final,
             key=key, mode=mode, meter=meter, genre=new_genre,
             voicing=voicing, voicing_spread=voicing_spread,
-            bpb=bpb, rng=rng,
+            bpb=bpb, rng=rng, sub_style=sub_style,
         )
         harmony_events.extend(h_events)
         if is_final:
@@ -236,12 +251,14 @@ def transform_ir(
             chord_root=chord_root, chord_for_harmony=chord_for_harmony,
             is_final=is_final, key=key, mode=mode, meter=meter,
             genre=new_genre, bpb=bpb, ring_out=ring_out_beats, rng=rng,
+            sub_style=sub_style,
         ))
 
         percussion_events.extend(_rebuild_percussion_bar(
             bar_idx=bar_idx, section=section,
             is_first_intro_bar=(section == "INTRO" and bar_idx == 0),
             is_final=is_final, meter=meter, genre=new_genre, rng=rng,
+            sub_style=sub_style,
         ))
 
     # ── humanize: re-apply velocity curves per preset profile ──────
