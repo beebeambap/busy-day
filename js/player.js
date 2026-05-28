@@ -1053,6 +1053,15 @@ function variantLabel(song, allVariants = null) {
   return parts.length ? parts.join(" · ") : song.variant_id;
 }
 
+// Compact label for a tape chip RENDERED INSIDE its source's group.
+// Since the source name is already in the group header, the child chip
+// just shows its preset (e.g. "🌧 비"). Used by the source-grouped
+// variant chip layout. Keeps chips short → fits more per row.
+function tapeChildChipLabel(song) {
+  const meta = TAPE_LABELS[song.tape_id] || {};
+  return `${meta.icon || "🎵"} ${meta.short || song.tape_id}`;
+}
+
 export class DetailPanel {
   constructor({ root, onTapeTrigger = null, onPinChange = null,
                onRerender = null }) {
@@ -1435,117 +1444,115 @@ export class DetailPanel {
     }
     this.variantsEl.hidden = false;
 
-    // Split into originals (no tape_id) and tape arrangements so the
-    // listener's mental model is clear: originals are independent
-    // recordings of the day; tapes are rearrangements derived from
-    // one of those originals (same melody, different palette).
+    // Source-grouped layout: each row = one original + its arrangements.
+    // Mirrors the data model (source_song_id parent-child) visually so
+    // listeners can scan "this 산책 has weather + genre versions"
+    // without parsing chip labels. Replaces the previous flat
+    // "원곡 / 편곡" split which scaled poorly once a single source
+    // accumulated multiple arrangement types.
     const originals = this.variants.filter((v) => !v.tape_id);
     const tapes     = this.variants.filter((v) =>  v.tape_id);
 
-    // Build an "originalId -> tape children" map once so each original
-    // chip can show small icon badges for its derived tape variants.
     const childrenOf = new Map();
+    const orphans = [];
     for (const t of tapes) {
-      if (!t.source_song_id) continue;
-      const arr = childrenOf.get(t.source_song_id) || [];
-      arr.push(t);
-      childrenOf.set(t.source_song_id, arr);
+      const parent = t.source_song_id
+        && originals.find((o) => o.id === t.source_song_id);
+      if (parent) {
+        const arr = childrenOf.get(parent.id) || [];
+        arr.push(t);
+        childrenOf.set(parent.id, arr);
+      } else {
+        orphans.push(t);
+      }
     }
 
-    // Helper that finds a button by song-id within the chips container.
-    // Used by tape-chip hover handlers to ring the source chip on hover
-    // and by the active-state pass below to mark "this original is the
-    // source of the currently-playing tape".
     const findChipById = (songId) =>
       this.variantsEl.querySelector(`button[data-song-id="${songId}"]`);
 
-    const renderGroup = (label, items) => {
-      if (!items.length) return;
-      const group = document.createElement("div");
-      group.className = "variant-group";
+    const buildChip = (v, { isParentInGroup = false } = {}) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.songId = v.id;
+      if (v.source_song_id) b.dataset.sourceId = v.source_song_id;
 
-      const lab = document.createElement("span");
-      lab.className = "variant-group-label";
-      lab.textContent = label;
-      group.appendChild(lab);
+      const labelSpan = document.createElement("span");
+      // Inside a source group, the parent chip just says "원곡"; tape
+      // children show "🌧 비" (preset only). The full variantLabel
+      // (with source name) is reserved for orphans where context is lost.
+      if (isParentInGroup) {
+        labelSpan.textContent = "원곡";
+      } else if (v.tape_id) {
+        labelSpan.textContent = tapeChildChipLabel(v);
+      } else {
+        labelSpan.textContent = variantLabel(v, this.variants);
+      }
+      b.appendChild(labelSpan);
+
+      if (v.pin_type === "legendary" || v.pin_type === "worst") {
+        const pinBadge = document.createElement("span");
+        pinBadge.className = `chip-pin chip-pin-${v.pin_type}`;
+        pinBadge.textContent = v.pin_type === "legendary" ? "⭐" : "👎";
+        pinBadge.title = v.pin_type === "legendary" ? "레전더리" : "워스트";
+        b.appendChild(pinBadge);
+      }
+
+      if (v.id === this.song.id) b.classList.add("active");
+
+      if (v.tape_id && v.source_song_id) {
+        const ringOn  = () => findChipById(v.source_song_id)
+                                ?.classList.add("source-hover");
+        const ringOff = () => findChipById(v.source_song_id)
+                                ?.classList.remove("source-hover");
+        b.addEventListener("mouseenter", ringOn);
+        b.addEventListener("mouseleave", ringOff);
+        b.addEventListener("focus",      ringOn);
+        b.addEventListener("blur",       ringOff);
+      }
+
+      b.addEventListener("click", () => {
+        if (v.id === this.song.id) return;
+        this.swapTo(v);
+      });
+      return b;
+    };
+
+    // One group per original (parent + its arrangements).
+    for (const orig of originals) {
+      const group = document.createElement("div");
+      group.className = "variant-source-group";
+
+      const header = document.createElement("div");
+      header.className = "variant-source-header";
+      header.textContent = variantLabel(orig);
+      group.appendChild(header);
 
       const row = document.createElement("div");
       row.className = "variant-row";
-      for (const v of items) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.dataset.songId = v.id;
-        if (v.source_song_id) b.dataset.sourceId = v.source_song_id;
-
-        // Main label span — the chip's text content
-        const labelSpan = document.createElement("span");
-        labelSpan.textContent = variantLabel(v, this.variants);
-        b.appendChild(labelSpan);
-
-        // Pin badge — small ⭐/👎 next to the label so the listener
-        // can see at a glance which variant carries the user's pin.
-        if (v.pin_type === "legendary" || v.pin_type === "worst") {
-          const pinBadge = document.createElement("span");
-          pinBadge.className = `chip-pin chip-pin-${v.pin_type}`;
-          pinBadge.textContent = v.pin_type === "legendary" ? "⭐" : "👎";
-          pinBadge.title = v.pin_type === "legendary" ? "레전더리" : "워스트";
-          b.appendChild(pinBadge);
-        }
-
-        // For originals: append small icon badges for each tape that
-        // was derived from this song. Lets the listener scan one row
-        // and see "this 산책 has 🌧 and 🌞 versions" at a glance.
-        if (!v.tape_id) {
-          const kids = childrenOf.get(v.id);
-          if (kids && kids.length) {
-            const badges = document.createElement("span");
-            badges.className = "tape-children";
-            for (const t of kids) {
-              const meta = TAPE_LABELS[t.tape_id] || {};
-              const ic = document.createElement("span");
-              ic.className = "tape-child-icon";
-              ic.textContent = meta.icon || "🎵";
-              ic.title = `${meta.label || t.tape_id} 편곡 존재`;
-              badges.appendChild(ic);
-            }
-            b.appendChild(badges);
-          }
-        }
-
-        if (v.id === this.song.id) b.classList.add("active");
-
-        // Tape-chip hover/focus: ring the source chip so the
-        // parent-child link is visible from both directions.
-        // (Mobile relies on the persistent .is-source-of-active mark
-        // added below; hover is a desktop nice-to-have.)
-        if (v.tape_id && v.source_song_id) {
-          const ringOn  = () => findChipById(v.source_song_id)
-                                  ?.classList.add("source-hover");
-          const ringOff = () => findChipById(v.source_song_id)
-                                  ?.classList.remove("source-hover");
-          b.addEventListener("mouseenter", ringOn);
-          b.addEventListener("mouseleave", ringOff);
-          b.addEventListener("focus",      ringOn);
-          b.addEventListener("blur",       ringOff);
-        }
-
-        b.addEventListener("click", () => {
-          if (v.id === this.song.id) return;
-          this.swapTo(v);
-        });
-        row.appendChild(b);
+      row.appendChild(buildChip(orig, { isParentInGroup: true }));
+      for (const child of (childrenOf.get(orig.id) || [])) {
+        row.appendChild(buildChip(child));
       }
       group.appendChild(row);
       this.variantsEl.appendChild(group);
-    };
+    }
 
-    renderGroup("원곡", originals);
-    renderGroup("편곡", tapes);
+    // Orphan arrangements (source not in this date's variants — rare).
+    if (orphans.length) {
+      const group = document.createElement("div");
+      group.className = "variant-source-group";
+      const header = document.createElement("div");
+      header.className = "variant-source-header muted";
+      header.textContent = "기타 편곡";
+      group.appendChild(header);
+      const row = document.createElement("div");
+      row.className = "variant-row";
+      for (const o of orphans) row.appendChild(buildChip(o));
+      group.appendChild(row);
+      this.variantsEl.appendChild(group);
+    }
 
-    // After both rows are in the DOM: if the active variant is a tape,
-    // mark its source chip so the listener immediately sees which
-    // original this arrangement came from. Stays through chip swaps;
-    // the next renderVariantChips() rebuild clears it.
+    // Active tape → ring its source chip (parent-child link both ways).
     if (this.song?.tape_id && this.song?.source_song_id) {
       findChipById(this.song.source_song_id)
         ?.classList.add("is-source-of-active");
