@@ -136,6 +136,11 @@ def main(argv: list[str] | None = None) -> int:
         register_styles(sub)
     except Exception:
         pass
+    try:
+        from .styles.batch import register as register_styles_batch
+        register_styles_batch(sub)
+    except Exception:
+        pass
 
     # `rerender` re-renders published songs from their stored IR so
     # render-side fixes (acoustic salt, channel balance, …) reach

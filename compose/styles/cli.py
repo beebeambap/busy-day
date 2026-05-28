@@ -85,31 +85,37 @@ def _seed_for_style(source_seed: int, preset_id: str, variant_id: str) -> int:
     return int.from_bytes(h[:8], "big") & ((1 << 63) - 1)
 
 
-def cmd_styles(args: argparse.Namespace) -> int:
-    sb = Supabase()
-    src = _fetch_song(sb, args.source_id)
+def run_style_arrangement(sb: Supabase, source_id: str,
+                          style: str | None = None,
+                          variant: str | None = None) -> dict:
+    """Core single-song arrangement. Returns dict:
+      {status: "created"|"skipped"|"failed",
+       reason: <human str>,
+       preset_id: <str|None>,
+       variant_id: <str|None>,
+       song_id: <uuid|None>}
 
-    # ── Validation ────────────────────────────────────────────────
+    Used by cmd_styles (CLI) and styles_batch (loop)."""
+    src = _fetch_song(sb, source_id)
+
     if src.get("pin_type") == "worst":
-        print(f"SKIP {args.source_id}: source is worst-pinned")
-        return 0
+        return {"status": "skipped", "reason": "worst-pinned",
+                "preset_id": None, "variant_id": None, "song_id": None}
     if src.get("tape_id"):
-        # Already an arrangement (tape or style) → don't arrange-of-arrangement
-        print(f"SKIP {args.source_id}: source is itself an arrangement "
-              f"(tape_id={src['tape_id']})")
-        return 0
+        return {"status": "skipped",
+                "reason": f"already an arrangement (tape_id={src['tape_id']})",
+                "preset_id": None, "variant_id": None, "song_id": None}
     paths_src = src.get("paths") or {}
     if not paths_src.get("ir_short") or not paths_src.get("ir_long"):
         raise RuntimeError(
-            f"source song {args.source_id} has no IR paths (paths={paths_src})"
+            f"source song {source_id} has no IR paths (paths={paths_src})"
         )
 
-    # ── Preset selection ─────────────────────────────────────────
-    if args.style:
-        preset = STYLE_PRESETS.get(args.style)
+    if style:
+        preset = STYLE_PRESETS.get(style)
         if preset is None:
             raise SystemExit(
-                f"unknown style preset: {args.style!r} "
+                f"unknown style preset: {style!r} "
                 f"(known: {sorted(STYLE_PRESETS.keys())})"
             )
         if preset.source_genre != src["genre"]:
@@ -118,32 +124,28 @@ def cmd_styles(args: argparse.Namespace) -> int:
                 f"{preset.source_genre!r}, but source is {src['genre']!r}"
             )
     else:
-        # Rule-based auto-pick from the source's features. We need a
-        # minimal IR-like dict for choose_for_source.
         pseudo_ir = {
-            "spec": {
-                "genre":     src["genre"],
-                "sub_style": None,  # source row doesn't carry sub_style;
-                                    # safest assumption — never equal to
-                                    # any preset's sub_style → no conflict
-            },
+            "spec": {"genre": src["genre"], "sub_style": None},
             "features": src.get("features") or {},
         }
         preset = choose_for_source(pseudo_ir)
         if preset is None:
-            print(f"SKIP {args.source_id}: no rule for genre {src['genre']!r}")
-            return 0
+            return {"status": "skipped",
+                    "reason": f"no rule for genre {src['genre']!r}",
+                    "preset_id": None, "variant_id": None, "song_id": None}
 
-    # ── Idempotency: same source + same preset already exists? ─────
-    existing = _existing_style_child(sb, args.source_id, preset.id)
+    existing = _existing_style_child(sb, source_id, preset.id)
     if existing:
-        print(f"SKIP {args.source_id}: already arranged as {preset.id} "
-              f"(existing variant={existing['variant_id']})")
-        return 0
+        return {"status": "skipped",
+                "reason": f"already arranged as {preset.id} "
+                          f"(variant={existing['variant_id']})",
+                "preset_id": preset.id,
+                "variant_id": existing['variant_id'],
+                "song_id": existing['id']}
 
     city    = src["city_id"]
     date    = src["date"]
-    variant_id = args.variant or f"style-{preset.id}-{_kst_hhmm()}"
+    variant_id = variant or f"style-{preset.id}-{_kst_hhmm()}"
 
     # ── Download source IRs ───────────────────────────────────────
     ir_short_src = json.loads(sb.get_file(paths_src["ir_short"]).decode("utf-8"))
@@ -213,24 +215,51 @@ def cmd_styles(args: argparse.Namespace) -> int:
         # Reuse tape_id column for style preset id — both share the
         # parent-child arrangement model. UI distinguishes by prefix.
         "tape_id":            preset.id,
-        "source_song_id":     args.source_id,
+        "source_song_id":     source_id,
     }
     inserted = sb.upsert_row(
         "songs", row,
         on_conflict="city_id,date,generator_ver,variant_id",
     )
 
+    return {
+        "status":     "created",
+        "reason":     "ok",
+        "preset_id":  preset.id,
+        "variant_id": variant_id,
+        "song_id":    inserted.get("id"),
+        # extra metadata used by the CLI summary printer
+        "city": city, "date": date, "spec": spec,
+        "duration_short": ir_short["duration_sec"],
+        "duration_long":  ir_long["duration_sec"],
+        "preset_label":   preset.label_ko,
+    }
+
+
+def cmd_styles(args: argparse.Namespace) -> int:
+    sb = Supabase()
+    r = run_style_arrangement(sb, args.source_id,
+                              style=args.style, variant=args.variant)
+    if r["status"] == "skipped":
+        print(f"SKIP {args.source_id}: {r['reason']}")
+        return 0
+    if r["status"] != "created":
+        print(f"FAIL {args.source_id}: {r['reason']}")
+        return 1
+    spec = r["spec"]
     print(
-        f"\033[1m[busy-day style]\033[0m {date}  {city}  variant={variant_id}\n"
-        f"  preset        : {preset.id} ({preset.label_ko})\n"
+        f"\033[1m[busy-day style]\033[0m {r['date']}  {r['city']}  "
+        f"variant={r['variant_id']}\n"
+        f"  preset        : {r['preset_id']} ({r['preset_label']})\n"
         f"  source        : {args.source_id}\n"
         f"  spec          : {spec['key_root']} {spec['mode']} · "
         f"{spec['genre']} · {spec['bpm']} BPM · {spec['meter']} · "
         f"sub={spec.get('sub_style')}\n"
-        f"  short / long  : {ir_short['duration_sec']:.1f}s / "
-        f"{ir_long['duration_sec']:.1f}s\n"
-        f"  storage       : busy-day-archive/{city}/{date}/{variant_id}/\n"
-        f"  songs.id      : {inserted.get('id')}"
+        f"  short / long  : {r['duration_short']:.1f}s / "
+        f"{r['duration_long']:.1f}s\n"
+        f"  storage       : busy-day-archive/{r['city']}/{r['date']}/"
+        f"{r['variant_id']}/\n"
+        f"  songs.id      : {r['song_id']}"
     )
     return 0
 

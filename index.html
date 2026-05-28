@@ -66,8 +66,26 @@
     <div class="make-row">
       <button id="make-btn" type="button" class="make">+ 오늘 곡 더 만들기</button>
       <button id="rerender-range-btn" type="button" class="make secondary">↻ 범위 재렌더</button>
+      <button id="style-batch-btn" type="button" class="make secondary">♫ 이번 달 장르 편곡</button>
     </div>
   </main>
+
+  <!-- ── month-batch genre arrangement modal ─────────────────── -->
+  <aside id="style-batch-modal" class="intent-modal" hidden aria-hidden="true">
+    <div class="intent-inner narrow">
+      <button id="style-batch-close" class="close" aria-label="닫기">✕</button>
+      <h3>이번 달 장르 편곡</h3>
+      <p class="muted small">
+        달력에서 보고 있는 달의 모든 원곡을 룰 기반 장르 편곡합니다.
+        편곡곡·워스트 곡은 자동 제외. 시간이 오래 걸릴 수 있습니다.
+      </p>
+      <p id="style-batch-target" class="muted small">—</p>
+      <p id="style-batch-count" class="muted small">대상 곡 집계 중…</p>
+      <div class="modal-actions">
+        <button id="style-batch-run" type="button" class="primary" disabled>편곡 시작</button>
+      </div>
+    </div>
+  </aside>
 
   <!-- ── range re-render modal ───────────────────────────────── -->
   <aside id="rerender-modal" class="intent-modal" hidden aria-hidden="true">
@@ -191,6 +209,11 @@
           <span class="rr-icon" aria-hidden="true">&#x21bb;</span>
           <span class="rr-label">이 날 전체</span>
           <span class="rr-sub muted small">모든 변형</span>
+        </button>
+        <button id="style-btn" type="button" class="rerender-btn" hidden>
+          <span class="rr-icon" aria-hidden="true">&#x266B;</span>
+          <span class="rr-label">장르 편곡</span>
+          <span class="rr-sub muted small">자동 (룰 기반)</span>
         </button>
       </div>
     </div>

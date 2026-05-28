@@ -159,6 +159,71 @@ export async function triggerRerender({ city, date, variant, to }) {
   return body;          // { ok, eta_sec }
 }
 
+// Genre-style arrangement (single song). Server rule-based unless
+// `style` is given. Returns { ok, mode:"single", variant_id, eta_sec }.
+// variant_id is empty when rule-based (preset unknown at dispatch time);
+// caller should refresh the calendar after the ETA in that case.
+export async function triggerStyle({ source_song_id, style }) {
+  const url = `${SUPABASE_URL}/functions/v1/trigger_style`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "apikey":         SUPABASE_PUBLISHABLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ source_song_id, style }),
+  });
+  const text = await r.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { error: text }; }
+  if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+  return body;
+}
+
+// Month-wide batch genre arrangement. Dispatches the same workflow in
+// batch mode; the workflow iterates eligible originals and runs the
+// rule per song. Returns { ok, mode:"batch", eta_sec }.
+export async function triggerStyleBatch({ city, year, month }) {
+  const url = `${SUPABASE_URL}/functions/v1/trigger_style`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type":  "application/json",
+      "apikey":         SUPABASE_PUBLISHABLE_KEY,
+      "Authorization": `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ city, year: String(year), month: String(month) }),
+  });
+  const text = await r.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { error: text }; }
+  if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+  return body;
+}
+
+// Count eligible source songs for batch (city, year, month). Filters
+// out arrangements (tape_id IS NULL) and worst-pinned songs. Used by
+// the month-batch confirm modal to show "N곡 편곡 예정".
+export async function countEligibleForBatch({ city, year, month }) {
+  const yy = Number(year), mm = Number(month);
+  const start = `${yy}-${String(mm).padStart(2, "0")}-01`;
+  const nextY = mm === 12 ? yy + 1 : yy;
+  const nextM = mm === 12 ? 1 : mm + 1;
+  const end = `${nextY}-${String(nextM).padStart(2, "0")}-01`;
+
+  const { count, error } = await supabase
+    .from("songs")
+    .select("id", { count: "exact", head: true })
+    .eq("city_id", city)
+    .gte("date", start)
+    .lt("date", end)
+    .is("tape_id", null)
+    .or("pin_type.is.null,pin_type.eq.legendary");
+  if (error) throw error;
+  return count || 0;
+}
+
 export async function recordPlay(songId, variant) {
   await supabase.from("plays").insert({
     song_id: songId,
