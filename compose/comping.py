@@ -1275,6 +1275,56 @@ _JAZZ_RUBATO_P = [
     [(1.0, "ride", 0.40), (3.0, "ride", 0.40)],
 ]
 
+# ── ambient → drone (Phase 1a 신규) ──────────────────────────────
+# 깊은 sustained 드론. 베이스가 root 하나로 깔리고 화성은 호흡만,
+# 타악기 거의 무음. 비/잔잔 날씨 ambient 곡에 적용.
+_AMB_DRONE_H = [
+    [(0.0, 4.0, "all", 1.00)],                                  # full-bar held
+    [(0.0, 2.0, "all", 1.00), (2.0, 2.0, "top", 0.90)],          # 2-half breath
+]
+_AMB_DRONE_B = [
+    [(0.0, 4.0, "root")],                                        # full-bar root drone
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],                   # gentle motion
+]
+_AMB_DRONE_P = [
+    [],                                                          # truly silent
+    [(0.0, "brush", 0.18)],                                      # heartbeat
+]
+
+# ── neo_classical → pedal (Phase 1a 신규) ────────────────────────
+# 페달 포인트: 베이스가 root를 길게 누르고 화성이 그 위에서 움직임.
+# 정적인 곡(잔잔한 날) 어울림.
+_NEO_PEDAL_H = [
+    [(0.0, 3.0, "all", 1.00), (3.0, 1.0, "top", 0.78)],          # 3-beat held + answer
+    [(0.0, 4.0, "all", 0.95)],                                    # full-bar suspension
+    [(0.0, 2.0, "all", 1.00), (2.0, 2.0, "top", 0.82)],          # block + arch
+]
+_NEO_PEDAL_B = [
+    [(0.0, 4.0, "root")],                                         # full-bar root pedal
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth_up")],                # octave leap
+]
+_NEO_PEDAL_P = [
+    [(0.0, "tap", 0.45)],                                         # tap on 1 only
+    [(0.0, "tap", 0.45), (2.0, "tap", 0.32)],                    # 1+3 sparse
+]
+
+# ── lo_fi → boombap (Phase 1a 신규) ──────────────────────────────
+# 무거운 kick + sub-bass 강조. half-time feel.
+# 흐리고 어두운 날(wetness↑ brightness↓) 어울림.
+_LOFI_BOOMBAP_H = [
+    [(0.0, 4.0, "top", 0.85)],                                    # tape-hiss sustain
+    [(0.5, 1.5, "top", 0.85), (2.5, 1.5, "top", 0.82)],          # lazy 2-hit
+]
+_LOFI_BOOMBAP_B = [
+    [(0.0, 3.5, "root"), (3.5, 0.5, "fifth")],                   # 808 sustain
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],                   # half-note sub
+]
+_LOFI_BOOMBAP_P = [
+    [(0.0, "kick", 0.78), (2.0, "snare", 0.62)],                 # half-time shell
+    [(0.0, "kick", 0.75), (1.0, "hat", 0.28),
+     (2.0, "snare", 0.60), (3.0, "hat", 0.28)],                  # + light hats
+]
+
 
 # Registry mapping (layer, genre, sub_style) → cell pack. Lookup is
 # 4/4 only — sub-styles aren't defined for 3/4 / 6/8 yet (those meters
@@ -1288,6 +1338,9 @@ _SUB_PACKS = {
         ("folk",        "celtic"):     _FOLK_CELTIC_H,
         ("jazz_ballad", "walking"):    _JAZZ_WALKING_H,
         ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_H,
+        ("ambient",       "drone"):    _AMB_DRONE_H,
+        ("neo_classical", "pedal"):    _NEO_PEDAL_H,
+        ("lo_fi",         "boombap"):  _LOFI_BOOMBAP_H,
     },
     "bass": {
         ("bossa_nova",  "basica"):     _BOSSA_BASICA_B,
@@ -1296,6 +1349,9 @@ _SUB_PACKS = {
         ("folk",        "celtic"):     _FOLK_CELTIC_B,
         ("jazz_ballad", "walking"):    _JAZZ_WALKING_B,
         ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_B,
+        ("ambient",       "drone"):    _AMB_DRONE_B,
+        ("neo_classical", "pedal"):    _NEO_PEDAL_B,
+        ("lo_fi",         "boombap"):  _LOFI_BOOMBAP_B,
     },
     "percussion": {
         ("bossa_nova",  "basica"):     _BOSSA_BASICA_P,
@@ -1304,5 +1360,8 @@ _SUB_PACKS = {
         ("folk",        "celtic"):     _FOLK_CELTIC_P,
         ("jazz_ballad", "walking"):    _JAZZ_WALKING_P,
         ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_P,
+        ("ambient",       "drone"):    _AMB_DRONE_P,
+        ("neo_classical", "pedal"):    _NEO_PEDAL_P,
+        ("lo_fi",         "boombap"):  _LOFI_BOOMBAP_P,
     },
 }
