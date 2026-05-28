@@ -1064,7 +1064,7 @@ function tapeChildChipLabel(song) {
 
 export class DetailPanel {
   constructor({ root, onTapeTrigger = null, onPinChange = null,
-               onRerender = null }) {
+               onRerender = null, onStyle = null }) {
     this.root        = root;
     this.dateEl      = root.querySelector("#detail-date");
     this.metaEl      = root.querySelector("#detail-meta");
@@ -1088,6 +1088,7 @@ export class DetailPanel {
     this.pinWorstBtn     = root.querySelector("#pin-worst-btn");
     this.rerenderBtn     = root.querySelector("#rerender-btn");
     this.rerenderDayBtn  = root.querySelector("#rerender-day-btn");
+    this.styleBtn        = root.querySelector("#style-btn");
 
     // Tape trigger lives in main.js so it can share the progress popup
     // and calendar refresh with the intent flow. We just call back when
@@ -1098,6 +1099,9 @@ export class DetailPanel {
     // Re-render trigger (wired in main.js): re-bakes the song's audio
     // from its stored IR with the latest render settings.
     this.onRerender = onRerender;
+    // Genre-style arrangement trigger (wired in main.js): single-song
+    // dispatch of the rule-based style preset for the source.
+    this.onStyle = onStyle;
     // Cache-bust token appended to MIDI/SVG URLs so a freshly re-rendered
     // file is re-fetched instead of served from browser cache.
     this._cacheBust = "";
@@ -1141,6 +1145,9 @@ export class DetailPanel {
     }
     if (this.rerenderDayBtn) {
       this.rerenderDayBtn.addEventListener("click", () => this._onRerenderClick(true));
+    }
+    if (this.styleBtn) {
+      this.styleBtn.addEventListener("click", () => this._onStyleClick());
     }
   }
 
@@ -1187,6 +1194,37 @@ export class DetailPanel {
     this.tapeBtn.querySelector(".tape-label").textContent = "편곡하기";
     this.tapeBtn.querySelector(".tape-sub").textContent = `${meta.label} 톤`;
     this.tapeActionEl.hidden = false;
+  }
+
+  // Show "장르 편곡" only when source is an ORIGINAL in one of the
+  // genres our rule supports. Hides itself for tape/style children
+  // (재편곡 보류 정책) and for unsupported genres.
+  _renderStyleAction(song) {
+    if (!this.styleBtn) return;
+    const RULE_GENRES = new Set([
+      "bossa_nova", "folk", "jazz_ballad",
+      "ambient", "neo_classical", "lo_fi",
+    ]);
+    const isArrangement = !!song?.tape_id;
+    const supported = RULE_GENRES.has(song?.genre);
+    this.styleBtn.hidden = isArrangement || !supported;
+  }
+
+  async _onStyleClick() {
+    if (!this.onStyle || !this.song) return;
+    this.styleBtn.disabled = true;
+    try {
+      // main.js handles dispatch + progress + calendar refresh. After
+      // it resolves true, fresh variants are visible via the next
+      // calendar render; we cache-bust the current song too.
+      const ok = await this.onStyle({ source_song_id: this.song.id });
+      if (ok) {
+        this._cacheBust = `v=${Date.now()}`;
+        await this.setVariant(this.variant || "short");
+      }
+    } finally {
+      if (this.styleBtn) this.styleBtn.disabled = false;
+    }
   }
 
   _renderPin(song) {
@@ -1249,6 +1287,7 @@ export class DetailPanel {
     this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
     this.renderVariantChips();
     this._renderTapeAction(song);
+    this._renderStyleAction(song);
     this._renderPin(song);
     this.renderMemo(song);
 
@@ -1566,6 +1605,7 @@ export class DetailPanel {
     this.metaEl.textContent = fmtMeta(song);
     this.createdEl.textContent = formatCreated(song.created_at, song.variant_id);
     this._renderTapeAction(song);
+    this._renderStyleAction(song);
     this._renderPin(song);
     this.renderMemo(song);
 

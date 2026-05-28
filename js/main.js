@@ -7,6 +7,9 @@ import {
   triggerCompose,
   triggerTape,
   triggerRerender,
+  triggerStyle,
+  triggerStyleBatch,
+  countEligibleForBatch,
 } from "./api.js";
 import { DEFAULT_CITY, DEFAULT_CITY_NAME } from "./config.js";
 import { TAPE_LABELS } from "./tapes.js";
@@ -265,11 +268,41 @@ function boot() {
     }
   }
 
+  // Single-song genre arrangement (rule-based). Dispatches the GHA
+  // workflow which picks the preset from source features, transforms,
+  // and inserts a new songs row. variant_id is server-allocated only
+  // when --style is given; for rule-based dispatch the frontend can't
+  // know it upfront, so we wait the ETA then refresh the calendar.
+  async function runStyle({ source_song_id }) {
+    const eta = 50;
+    progress.show(eta);
+    try {
+      const r = await triggerStyle({ source_song_id });
+      const realEta = r.eta_sec || eta;
+      const start = Date.now();
+      await new Promise((resolve) => {
+        const iv = setInterval(() => {
+          const elapsed = (Date.now() - start) / 1000;
+          progress.tick(elapsed, realEta);
+          if (elapsed >= realEta) { clearInterval(iv); resolve(); }
+        }, 1000);
+      });
+      progress.hide();
+      await cal.render();
+      return true;
+    } catch (err) {
+      console.error(err);
+      progress.fail(`장르 편곡 실패: ${err.message || err}`);
+      return false;
+    }
+  }
+
   const detail = new DetailPanel({
     root:          $("detail"),
     onTapeTrigger: runTapeTrigger,
     onPinChange:   () => cal.render(),
     onRerender:    runRerender,
+    onStyle:       runStyle,
   });
 
   const cal = new CalendarView({
@@ -351,11 +384,73 @@ function boot() {
     rrRun.disabled = true;
     rrStatus.textContent = "디스패치 중…";
     closeRrModal();
-    // variant omitted → every variant in the range. date = range start,
-    // to = range end. runRerender shares the progress popup.
     const ok = await runRerender({ city: DEFAULT_CITY, date: from, to, variant: "" });
     rrRun.disabled = false;
     if (ok) await cal.render();
+  });
+
+  // ── month-batch genre arrangement modal ─────────────────────
+  const sbModal  = $("style-batch-modal");
+  const sbTarget = $("style-batch-target");
+  const sbCount  = $("style-batch-count");
+  const sbRun    = $("style-batch-run");
+
+  async function openStyleBatchModal() {
+    // Target = the month the user is currently viewing in the calendar.
+    const year = cal.year, month = cal.month;
+    sbTarget.textContent = `대상: ${year}년 ${month}월 · ${DEFAULT_CITY_NAME}`;
+    sbCount.textContent  = "대상 곡 집계 중…";
+    sbRun.disabled = true;
+    sbModal.hidden = false;
+    sbModal.setAttribute("aria-hidden", "false");
+    try {
+      const n = await countEligibleForBatch({ city: DEFAULT_CITY, year, month });
+      const mins = Math.ceil(n * 0.75);   // ~45s per song, ceil
+      if (n === 0) {
+        sbCount.textContent = "편곡할 원곡 없음 (전부 편곡됐거나 워스트)";
+      } else {
+        sbCount.textContent = `${n}곡 편곡 예정 · 예상 ~${mins}분`;
+        sbRun.disabled = false;
+      }
+    } catch (err) {
+      sbCount.textContent = `집계 실패: ${err.message || err}`;
+    }
+  }
+  function closeStyleBatchModal() {
+    sbModal.hidden = true;
+    sbModal.setAttribute("aria-hidden", "true");
+  }
+
+  $("style-batch-btn").addEventListener("click", openStyleBatchModal);
+  $("style-batch-close").addEventListener("click", closeStyleBatchModal);
+  sbModal.addEventListener("click", (e) => { if (e.target === sbModal) closeStyleBatchModal(); });
+
+  sbRun.addEventListener("click", async () => {
+    const year = cal.year, month = cal.month;
+    sbRun.disabled = true;
+    closeStyleBatchModal();
+    // Batch ETA from server is heuristic (~22min). We show ~3min worth
+    // of progress UI then drop — the actual processing continues on GHA
+    // and the user sees new variants on calendar refreshes.
+    progress.show(180);
+    try {
+      const r = await triggerStyleBatch({ city: DEFAULT_CITY, year, month });
+      const tickEta = Math.min(180, r.eta_sec || 180);
+      const start = Date.now();
+      await new Promise((resolve) => {
+        const iv = setInterval(() => {
+          const elapsed = (Date.now() - start) / 1000;
+          progress.tick(elapsed, tickEta);
+          if (elapsed >= tickEta) { clearInterval(iv); resolve(); }
+        }, 1000);
+      });
+      progress.hide();
+      await cal.render();
+    } catch (err) {
+      progress.fail(`일괄 편곡 디스패치 실패: ${err.message || err}`);
+    } finally {
+      sbRun.disabled = false;
+    }
   });
 
   $("app").hidden = false;

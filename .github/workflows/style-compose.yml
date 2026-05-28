@@ -1,0 +1,84 @@
+name: style compose
+
+# Triggered by the trigger_style Edge Function.
+# Two modes (decided by which inputs are set):
+#   - single:  source_id (+ optional style/variant) → one arrangement
+#   - batch:   city + year + month → all eligible originals in the month
+#
+# Both flows read source IRs from Storage, apply the chosen style preset,
+# render new MIDI + SVG, and insert a new songs row with tape_id set to
+# the preset id and source_song_id linking back. No KMA fetch, no
+# compose-time RNG re-run — the source's notes are preserved.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_id:
+        description: "single mode: UUID of the source song"
+        type: string
+        required: false
+      style:
+        description: "single mode: preset id (e.g. bossa_jazz). Omit → rule-based"
+        type: string
+        required: false
+      variant:
+        description: "single mode: variant_id override. Omit → auto-generated"
+        type: string
+        required: false
+      city:
+        description: "batch mode: city id (e.g. seoul)"
+        type: string
+        required: false
+      year:
+        description: "batch mode: year (e.g. 2026)"
+        type: string
+        required: false
+      month:
+        description: "batch mode: month 1..12"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  arrange:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30        # batch over a busy month can take a while
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mido verovio requests
+
+      - name: Apply style arrangement(s)
+        env:
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_STORAGE_BUCKET:   busy-day-archive
+          SOURCE_ID: ${{ github.event.inputs.source_id }}
+          STYLE:     ${{ github.event.inputs.style }}
+          VARIANT:   ${{ github.event.inputs.variant }}
+          CITY:      ${{ github.event.inputs.city }}
+          YEAR:      ${{ github.event.inputs.year }}
+          MONTH:     ${{ github.event.inputs.month }}
+        run: |
+          if [ -n "$SOURCE_ID" ]; then
+            ARGS=(--source-id "$SOURCE_ID")
+            [ -n "$STYLE"   ] && ARGS+=(--style   "$STYLE")
+            [ -n "$VARIANT" ] && ARGS+=(--variant "$VARIANT")
+            python -m compose styles "${ARGS[@]}"
+          elif [ -n "$CITY" ] && [ -n "$YEAR" ] && [ -n "$MONTH" ]; then
+            python -m compose styles-batch --city "$CITY" \
+              --year "$YEAR" --month "$MONTH"
+          else
+            echo "Either source_id (single) or city+year+month (batch) required."
+            exit 1
+          fi
