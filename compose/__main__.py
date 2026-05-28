@@ -128,6 +128,15 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:
         pass
 
+    # `styles` is the genre-style arrangement pipeline (source IR ->
+    # rule-based or user-specified preset -> transform -> render ->
+    # upload). Parallel to `tape` but stays within the source's genre.
+    try:
+        from .styles.cli import register as register_styles
+        register_styles(sub)
+    except Exception:
+        pass
+
     # `rerender` re-renders published songs from their stored IR so
     # render-side fixes (acoustic salt, channel balance, …) reach
     # already-released tracks without changing a single note.
