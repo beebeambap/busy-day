@@ -22,7 +22,13 @@ const CORS_HEADERS = {
 const TAPE_IDS = new Set([
   "clear_hot",
   "rain",
-  // planned: "cold", "snow", "fog", "storm"
+  "snow",
+  "fog",
+  "cold_clear",
+  "humid",
+  "windy",
+  "storm",
+  "cool_clear",
 ]);
 
 const UUID_RE =
