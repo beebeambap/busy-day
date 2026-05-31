@@ -219,6 +219,90 @@ STYLE_PRESETS: dict[str, StylePreset] = {
         swing_ratio=1.20,                       # light Dilla shuffle
         groove_delay_ms=18.0,                   # behind-beat
     ),
+
+    # ── Phase 2 신규 — 각 장르 3순위 옵션 ────────────────────────
+
+    "bossa_samba": StylePreset(
+        id="bossa_samba",
+        label_ko="삼바 (활동적)",
+        icon="🍹",
+        source_genre="bossa_nova",
+        genre_override="bossa_nova",
+        sub_style="samba",
+        voicing="seventh",
+        # Faster, denser samba feel — 밝고 따뜻 + 활동적 날.
+        bpm_multiplier=1.10,
+        melody_instrument="nylon",
+        velocity_profile={"melody": (66, 32), "harmony": (54, 22),
+                          "bass": (60, 22)},
+    ),
+    "folk_stomp": StylePreset(
+        id="folk_stomp",
+        label_ko="발 구르기 (Mumford)",
+        icon="🥾",
+        source_genre="folk",
+        genre_override="folk",
+        sub_style="stomp",
+        voicing="triad",
+        # Loud foot-stomping americana — kick+snare 강조.
+        bpm_multiplier=1.08,
+        melody_instrument="nylon",
+        velocity_profile={"melody": (68, 32), "harmony": (56, 22),
+                          "bass": (62, 22)},
+    ),
+    "jazz_swing": StylePreset(
+        id="jazz_swing",
+        label_ko="스윙 (Uptempo)",
+        icon="🎺",
+        source_genre="jazz_ballad",
+        genre_override="jazz_ballad",
+        sub_style="swing",
+        voicing="seventh",
+        bpm_multiplier=1.08,
+        melody_instrument="piano",
+        velocity_profile={"melody": (60, 28), "harmony": (48, 20),
+                          "bass": (56, 20)},
+        swing_ratio=1.50,                       # clear hard-bop swing
+    ),
+    "amb_film": StylePreset(
+        id="amb_film",
+        label_ko="영화음악 풍",
+        icon="🎬",
+        source_genre="ambient",
+        genre_override="ambient",
+        sub_style="film",
+        voicing="ninth",
+        bpm_multiplier=0.92,
+        melody_instrument="strings",            # GM 48 String Ensemble
+        velocity_profile={"melody": (54, 22), "harmony": (44, 18),
+                          "bass": (50, 18)},
+    ),
+    "neo_romantic": StylePreset(
+        id="neo_romantic",
+        label_ko="낭만파 (Einaudi)",
+        icon="🌹",
+        source_genre="neo_classical",
+        genre_override="neo_classical",
+        sub_style="romantic",
+        voicing="ninth",
+        bpm_multiplier=0.88,
+        melody_instrument="piano",
+        velocity_profile={"melody": (60, 28), "harmony": (48, 20),
+                          "bass": (54, 20)},
+    ),
+    "lofi_ambient": StylePreset(
+        id="lofi_ambient",
+        label_ko="앰비언트 로파이",
+        icon="🪐",
+        source_genre="lo_fi",
+        genre_override="lo_fi",
+        sub_style="ambient_lofi",
+        voicing="open_fifth",
+        bpm_multiplier=0.78,                    # very slow
+        melody_instrument="rhodes",
+        velocity_profile={"melody": (42, 20), "harmony": (32, 14),
+                          "bass": (38, 12)},
+    ),
 }
 
 
@@ -229,41 +313,82 @@ STYLE_PRESETS: dict[str, StylePreset] = {
 # arrangements). Phase 1a: 2-option lists; Phase 2 can extend to 3.
 
 def _rule_bossa(f: dict) -> list[str]:
-    if f.get("calmness", 0.5) >= 0.65:
-        return ["bossa_jazz", "bossa_basica"]   # 잔잔 → 재즈 발라드 풍
-    return ["bossa_basica", "bossa_jazz"]       # 그 외 → 정통 보사
+    calm = f.get("calmness", 0.5)
+    warm = f.get("warmth", 0.5)
+    bright = f.get("brightness", 0.5)
+    # 잔잔 → 재즈 발라드 풍
+    if calm >= 0.65:
+        return ["bossa_jazz", "bossa_basica", "bossa_samba"]
+    # 따뜻하고 밝고 활동적 → 삼바
+    if calm < 0.55 and warm >= 0.60 and bright >= 0.55:
+        return ["bossa_samba", "bossa_basica", "bossa_jazz"]
+    # 그 외 → 정통 보사
+    return ["bossa_basica", "bossa_jazz", "bossa_samba"]
 
 
 def _rule_folk(f: dict) -> list[str]:
+    wet = f.get("wetness", 0.0)
+    calm = f.get("calmness", 0.5)
+    bright = f.get("brightness", 0.5)
     # wetness 또는 (잔잔 + 어두움) → 켈틱 드론
-    if f.get("wetness", 0.0) >= 0.40 or (
-            f.get("calmness", 0.5) >= 0.65 and f.get("brightness", 0.5) < 0.55):
-        return ["folk_celtic", "folk_boomchick"]
-    return ["folk_boomchick", "folk_celtic"]
+    if wet >= 0.40 or (calm >= 0.65 and bright < 0.55):
+        return ["folk_celtic", "folk_boomchick", "folk_stomp"]
+    # 밝고 활동적 → 스톰프 (Mumford)
+    if bright >= 0.60 and calm < 0.55:
+        return ["folk_stomp", "folk_boomchick", "folk_celtic"]
+    return ["folk_boomchick", "folk_celtic", "folk_stomp"]
 
 
 def _rule_jazz(f: dict) -> list[str]:
-    if f.get("calmness", 0.5) >= 0.70:
-        return ["jazz_rubato", "jazz_walking"]
-    return ["jazz_walking", "jazz_rubato"]
+    calm = f.get("calmness", 0.5)
+    warm = f.get("warmth", 0.5)
+    # 잔잔 → 루바토 (Bill Evans pause)
+    if calm >= 0.70:
+        return ["jazz_rubato", "jazz_walking", "jazz_swing"]
+    # 따뜻 + 활동적 → 스윙 (uptempo)
+    if calm < 0.55 and warm >= 0.55:
+        return ["jazz_swing", "jazz_walking", "jazz_rubato"]
+    return ["jazz_walking", "jazz_rubato", "jazz_swing"]
 
 
 def _rule_ambient(f: dict) -> list[str]:
-    if f.get("wetness", 0.0) >= 0.50 or f.get("calmness", 0.5) >= 0.75:
-        return ["amb_drone", "amb_pad"]
-    return ["amb_pad", "amb_drone"]
+    wet = f.get("wetness", 0.0)
+    calm = f.get("calmness", 0.5)
+    bright = f.get("brightness", 0.5)
+    warm = f.get("warmth", 0.5)
+    # wet 또는 매우 잔잔 → 드론
+    if wet >= 0.50 or calm >= 0.75:
+        return ["amb_drone", "amb_pad", "amb_film"]
+    # 밝고 따뜻 → 영화음악 풍 (orchestral motion)
+    if bright >= 0.60 and warm >= 0.55:
+        return ["amb_film", "amb_pad", "amb_drone"]
+    return ["amb_pad", "amb_drone", "amb_film"]
 
 
 def _rule_neo(f: dict) -> list[str]:
-    if f.get("calmness", 0.5) >= 0.65:
-        return ["neo_pedal", "neo_alberti"]
-    return ["neo_alberti", "neo_pedal"]
+    calm = f.get("calmness", 0.5)
+    bright = f.get("brightness", 0.5)
+    wet = f.get("wetness", 0.0)
+    # 잔잔 → 페달 포인트
+    if calm >= 0.65:
+        return ["neo_pedal", "neo_alberti", "neo_romantic"]
+    # 어두움 또는 wet → 낭만파 (감성)
+    if bright < 0.45 or wet >= 0.40:
+        return ["neo_romantic", "neo_alberti", "neo_pedal"]
+    return ["neo_alberti", "neo_pedal", "neo_romantic"]
 
 
 def _rule_lofi(f: dict) -> list[str]:
-    if f.get("wetness", 0.0) >= 0.50 and f.get("brightness", 0.5) < 0.50:
-        return ["lofi_boombap", "lofi_chill"]
-    return ["lofi_chill", "lofi_boombap"]
+    wet = f.get("wetness", 0.0)
+    bright = f.get("brightness", 0.5)
+    calm = f.get("calmness", 0.5)
+    # 매우 wet + 잔잔 → 앰비언트 로파이 (드럼 없음)
+    if wet >= 0.55 and calm >= 0.65:
+        return ["lofi_ambient", "lofi_chill", "lofi_boombap"]
+    # wet + 어두움 → 붐뱁
+    if wet >= 0.50 and bright < 0.50:
+        return ["lofi_boombap", "lofi_chill", "lofi_ambient"]
+    return ["lofi_chill", "lofi_boombap", "lofi_ambient"]
 
 
 _RULES = {
