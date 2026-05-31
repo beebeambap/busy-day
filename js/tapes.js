@@ -10,34 +10,54 @@
 // server-side via /trigger_tape -> tape-compose.yml.
 
 export const TAPE_LABELS = {
-  clear_hot: { label: "맑고 더운 날", icon: "🌞", short: "맑고 더운 날 편곡" },
-  rain:      { label: "비 오는 날",   icon: "🌧", short: "비 오는 날 편곡" },
-  // planned (designed in weather-tapes-arrangement-system-v1.md):
-  // cold  : "한파",       🌡
-  // snow  : "눈 오는 날", ❄️
-  // fog   : "흐린 날",    🌫
-  // storm : "폭풍",       🌩
+  clear_hot:  { label: "맑고 더운 날",       icon: "🌞", short: "맑고 더운 날 편곡" },
+  rain:       { label: "비 오는 날",        icon: "🌧", short: "비 오는 날 편곡" },
+  snow:       { label: "눈 오는 날",        icon: "❄",  short: "눈 오는 날 편곡" },
+  fog:        { label: "안개 낀 날",        icon: "🌫", short: "안개 낀 날 편곡" },
+  cold_clear: { label: "춥고 맑은 날",       icon: "🥶", short: "춥고 맑은 날 편곡" },
+  humid:      { label: "장마같은 끈끈한 날", icon: "💧", short: "끈끈한 날 편곡" },
+  windy:      { label: "바람 부는 날",       icon: "💨", short: "바람 부는 날 편곡" },
+  storm:      { label: "폭풍 치는 날",       icon: "⛈", short: "폭풍 치는 날 편곡" },
+  cool_clear: { label: "선선하고 맑은 날",    icon: "🌸", short: "선선하고 맑은 날 편곡" },
 };
 
-// Mirror of compose/tapes/presets.py::match_weather()
+// Mirror of compose/tapes/presets.py::match_weather() — checked in
+// order of specificity (rare/dramatic conditions first).
 export function matchWeatherTape(weather) {
   if (!weather) return null;
   const temp   = Number(weather.temp_c    ?? 15);
   const cloud  = Number(weather.cloud_pct ?? 50);
   const precip = Number(weather.precip_mm ??  0);
+  const wind   = Number(weather.wind_mps  ??  2);
+  const humid  = Number(weather.humidity  ?? 60);
+  const ptype  = String(weather.precip_type ?? "none");
 
-  // CLEAR HOT: hot + sunny + dry. 25°C+ is summer-warm in Seoul,
-  // cloud ≤ 30% reads as "clear", precip threshold filters passing
-  // showers on otherwise-clear days.
-  if (temp >= 25.0 && cloud <= 30.0 && precip <= 0.5) {
-    return "clear_hot";
-  }
+  // 1) SNOW — precip_type wins regardless of other conditions.
+  if (ptype === "snow" || ptype === "rain_snow") return "snow";
 
-  // RAIN: meaningful rain + overcast. Temperature-agnostic in v1.
-  // Future COLD preset will take the freezing rainy days.
-  if (precip >= 0.3 && cloud >= 50.0) {
-    return "rain";
-  }
+  // 2) STORM — heavy rain + strong wind.
+  if (precip >= 5.0 && wind >= 5.0) return "storm";
+
+  // 3) RAIN — meaningful rain + overcast.
+  if (precip >= 0.3 && cloud >= 50.0) return "rain";
+
+  // 4) FOG — heavy cloud + humid + still air, no precip.
+  if (cloud >= 80.0 && humid >= 75.0 && wind < 3.0 && precip < 0.3) return "fog";
+
+  // 5) CLEAR_HOT — hot + clear + dry.
+  if (temp >= 25.0 && cloud <= 30.0 && precip <= 0.5) return "clear_hot";
+
+  // 6) COLD_CLEAR — freezing + clear + dry.
+  if (temp <= 5.0 && cloud <= 50.0 && precip < 0.3 && humid < 65.0) return "cold_clear";
+
+  // 7) HUMID — muggy summer, no rain.
+  if (humid >= 80.0 && temp >= 22.0 && precip < 0.5) return "humid";
+
+  // 8) WINDY — strong wind, dry.
+  if (wind >= 5.0 && precip < 1.0) return "windy";
+
+  // 9) COOL_CLEAR — mild clear-sky fallback.
+  if (temp >= 12.0 && temp <= 22.0 && cloud <= 30.0 && precip < 0.3) return "cool_clear";
 
   return null;
 }

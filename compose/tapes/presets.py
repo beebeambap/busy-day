@@ -129,9 +129,134 @@ RAIN = TapePreset(
 )
 
 
+# ── new presets (Phase 2 weather expansion) ──────────────────────
+
+# SNOW: winter music-box. Very slow, sparse, bell-like sparkle on a
+# neo-classical pedal-point bed. Uses the neo_pedal sub-style cells we
+# defined earlier (full-bar root + 3-beat sustain + 1-beat answer).
+SNOW = TapePreset(
+    id="snow",
+    label_ko="눈 오는 날",
+    genre_override="neo_classical",
+    voicing="open_fifth",       # cold modal / hollow
+    bpm_multiplier=0.78,        # very slow — snow stillness
+    melody_instrument="music_box",
+    velocity_profile={
+        "melody":  (40, 18),    # whisper sparkle
+        "harmony": (30, 12),    # barely there
+        "bass":    (34, 10),
+    },
+)
+
+# FOG: muffled ambient drone with breathy flute melody. Wide cloud +
+# high humidity + no wind = the still suspended-air feeling.
+FOG = TapePreset(
+    id="fog",
+    label_ko="안개 낀 날",
+    genre_override="ambient",
+    voicing="open_fifth",
+    bpm_multiplier=0.82,
+    melody_instrument="flute",
+    velocity_profile={
+        "melody":  (46, 20),
+        "harmony": (34, 14),
+        "bass":    (38, 12),
+    },
+)
+
+# COLD_CLEAR: nordic folk on a frozen sunny day. Harp + open-fifth
+# drone — the celtic sub-style cells already define this character.
+COLD_CLEAR = TapePreset(
+    id="cold_clear",
+    label_ko="춥고 맑은 날",
+    genre_override="folk",
+    voicing="open_fifth",
+    bpm_multiplier=0.92,
+    melody_instrument="harp",
+    velocity_profile={
+        "melody":  (54, 22),
+        "harmony": (42, 16),
+        "bass":    (50, 16),
+    },
+)
+
+# HUMID: stagnant summer day, smoky-jazz café. Like RAIN but no rain,
+# warmer, and even more sluggish. Rhodes + rubato sub-style cells.
+HUMID = TapePreset(
+    id="humid",
+    label_ko="장마같은 끈끈한 날",
+    genre_override="jazz_ballad",
+    voicing="ninth",
+    bpm_multiplier=0.85,
+    melody_instrument="rhodes",
+    velocity_profile={
+        "melody":  (48, 22),
+        "harmony": (36, 16),
+        "bass":    (46, 16),
+    },
+    swing_ratio=1.40,            # softer than RAIN's 1.50
+    groove_delay_ms=15.0,
+)
+
+# WINDY: open-air folk with motion and lift. Tin whistle melody,
+# uptempo, wide voicing spread (set by features-driven _spread_for).
+WINDY = TapePreset(
+    id="windy",
+    label_ko="바람 부는 날",
+    genre_override="folk",
+    voicing="seventh",
+    bpm_multiplier=1.10,         # forward push
+    melody_instrument="tin_whistle",
+    velocity_profile={
+        "melody":  (64, 28),
+        "harmony": (54, 22),
+        "bass":    (58, 20),
+    },
+)
+
+# STORM: dramatic dark cello on neo-classical pedal point. Bigger
+# dynamic range than other presets (loud melody + deep bass).
+STORM = TapePreset(
+    id="storm",
+    label_ko="폭풍 치는 날",
+    genre_override="neo_classical",
+    voicing="ninth",
+    bpm_multiplier=0.92,
+    melody_instrument="cello",
+    velocity_profile={
+        "melody":  (70, 32),     # dramatic
+        "harmony": (54, 22),
+        "bass":    (70, 24),     # deep + loud
+    },
+)
+
+# COOL_CLEAR: clear_hot's cooler cousin. Sunday-morning folk feel —
+# nylon, slight energy lift, no special groove.
+COOL_CLEAR = TapePreset(
+    id="cool_clear",
+    label_ko="선선하고 맑은 날",
+    genre_override="folk",
+    voicing="triad",
+    bpm_multiplier=1.05,
+    melody_instrument="nylon",
+    velocity_profile={
+        "melody":  (64, 30),
+        "harmony": (52, 22),
+        "bass":    (58, 22),
+    },
+)
+
+
 PRESETS: dict[str, TapePreset] = {
-    "clear_hot": CLEAR_HOT,
-    "rain":      RAIN,
+    "clear_hot":  CLEAR_HOT,
+    "rain":       RAIN,
+    "snow":       SNOW,
+    "fog":        FOG,
+    "cold_clear": COLD_CLEAR,
+    "humid":      HUMID,
+    "windy":      WINDY,
+    "storm":      STORM,
+    "cool_clear": COOL_CLEAR,
 }
 
 
@@ -146,27 +271,54 @@ def get(preset_id: str | None) -> TapePreset | None:
 def match_weather(weather: dict | None) -> str | None:
     """Return the preset id that matches `weather`, or None.
 
-    Used by the UI to decide which "편곡하기" button to show on a song's
-    detail panel. The criteria are intentionally narrow so a song only
-    gets a tape button when the day genuinely fits the preset's mood.
+    Checked in order of specificity — the more unusual conditions
+    (snow, storm) win over general ones (cool_clear, windy) so a
+    snowy windy day shows "snow" not "windy". The UI only shows the
+    matched preset's button.
     """
     if not weather:
         return None
     temp   = float(weather.get("temp_c",    15.0))
     cloud  = float(weather.get("cloud_pct", 50.0))
     precip = float(weather.get("precip_mm",  0.0))
+    wind   = float(weather.get("wind_mps",   2.0))
+    humid  = float(weather.get("humidity",  60.0))
+    ptype  = str(weather.get("precip_type", "none"))
 
-    # CLEAR HOT: hot + sunny + dry. 25°C+ is summer-warm in Seoul;
-    # cloud ≤ 30% reads as "clear"; precip threshold filters out
-    # passing showers on otherwise-clear days.
+    # 1) SNOW — precip_type wins regardless of other conditions.
+    if ptype in ("snow", "rain_snow"):
+        return "snow"
+
+    # 2) STORM — heavy rain + strong wind. Dramatic.
+    if precip >= 5.0 and wind >= 5.0:
+        return "storm"
+
+    # 3) RAIN — meaningful rain + overcast (existing).
+    if precip >= 0.3 and cloud >= 50.0:
+        return "rain"
+
+    # 4) FOG — heavy cloud + humid + still air, no precip.
+    if cloud >= 80.0 and humid >= 75.0 and wind < 3.0 and precip < 0.3:
+        return "fog"
+
+    # 5) CLEAR_HOT — hot + clear + dry (existing).
     if temp >= 25.0 and cloud <= 30.0 and precip <= 0.5:
         return "clear_hot"
 
-    # RAIN: any meaningful rain + overcast sky. We don't gate on
-    # temperature — rain is rain whether it's spring drizzle or autumn
-    # downpour. (Future COLD preset will take freezing rainy days; for
-    # now RAIN covers the whole "café 창가" temperature range.)
-    if precip >= 0.3 and cloud >= 50.0:
-        return "rain"
+    # 6) COLD_CLEAR — freezing + clear + dry.
+    if temp <= 5.0 and cloud <= 50.0 and precip < 0.3 and humid < 65.0:
+        return "cold_clear"
+
+    # 7) HUMID — muggy summer, no rain.
+    if humid >= 80.0 and temp >= 22.0 and precip < 0.5:
+        return "humid"
+
+    # 8) WINDY — strong wind, dry.
+    if wind >= 5.0 and precip < 1.0:
+        return "windy"
+
+    # 9) COOL_CLEAR — fallback clear-sky preset for mild weather.
+    if 12.0 <= temp <= 22.0 and cloud <= 30.0 and precip < 0.3:
+        return "cool_clear"
 
     return None
