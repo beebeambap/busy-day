@@ -1325,6 +1325,184 @@ _LOFI_BOOMBAP_P = [
      (2.0, "snare", 0.60), (3.0, "hat", 0.28)],                  # + light hats
 ]
 
+# ─────────────────────────────────────────────────────────────────
+# ── Phase 2 신규 sub-style 셀 (각 장르 3순위 옵션) ─────────────
+# ─────────────────────────────────────────────────────────────────
+
+# bossa_nova → samba: 16분 shaker + tap 강세. 밝고 따뜻 + 활동적 날.
+_BOSSA_SAMBA_H = [
+    # canonical: classic samba comping (denser anticipation)
+    [(0.0, 0.5, "root", 0.95), (0.75, 0.5, "top", 0.92),
+     (1.5, 0.5, "all",  0.85), (2.0, 0.5, "fifth", 0.85),
+     (2.75, 0.5, "top", 0.92), (3.5, 0.5, "top", 0.85)],
+    # alt: tumbao denser
+    [(0.0, 1.0, "root", 0.95),
+     (1.0, 0.5, "top", 0.85), (1.5, 0.5, "top", 0.82),
+     (2.0, 1.0, "all", 0.90),
+     (3.0, 0.5, "top", 0.85), (3.5, 0.5, "top", 0.82)],
+]
+_BOSSA_SAMBA_B = [
+    # canonical: samba dotted-quarter + eighth
+    [(0.0, 0.5, "root"), (0.5, 0.5, "fifth"),
+     (1.5, 0.5, "fifth"), (2.0, 0.5, "root"),
+     (2.5, 0.5, "fifth"), (3.5, 0.5, "root")],
+    # alt: walking samba (1-3-5-↑5)
+    [(0.0, 1.0, "root"), (1.0, 1.0, "third"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "fifth_up")],
+]
+_BOSSA_SAMBA_P = [
+    # canonical: 8th shaker + tap on 1+3
+    [(0.0, "tap", 0.55), (0.5, "shaker", 0.40),
+     (1.0, "shaker", 0.50), (1.5, "shaker", 0.40),
+     (2.0, "tap", 0.55), (2.5, "shaker", 0.40),
+     (3.0, "shaker", 0.50), (3.5, "shaker", 0.40)],
+    # alt: kick on 1+3 + shaker
+    [(0.0, "kick", 0.55), (0.5, "shaker", 0.40),
+     (1.0, "shaker", 0.45), (1.5, "shaker", 0.40),
+     (2.0, "kick", 0.55), (2.5, "shaker", 0.40),
+     (3.0, "shaker", 0.45), (3.5, "shaker", 0.40)],
+]
+
+# folk → stomp: Mumford 발 구르기. kick 1+3 / snare 2+4. 밝고 활동적.
+_FOLK_STOMP_H = [
+    # canonical: heavy strum 1+3 + top stab between
+    [(0.0, 1.0, "all", 0.95),
+     (1.0, 0.5, "top", 0.85), (1.5, 0.5, "top", 0.78),
+     (2.0, 1.0, "all", 0.92),
+     (3.0, 0.5, "top", 0.85), (3.5, 0.5, "top", 0.78)],
+    # alt: 8th gallop strum
+    [(0.0, 0.5, "all", 0.92), (0.5, 0.5, "top", 0.80),
+     (1.0, 0.5, "all", 0.88), (1.5, 0.5, "top", 0.78),
+     (2.0, 0.5, "all", 0.92), (2.5, 0.5, "top", 0.82),
+     (3.0, 0.5, "all", 0.88), (3.5, 0.5, "top", 0.78)],
+]
+_FOLK_STOMP_B = [
+    # canonical: stomp root on 1+3
+    [(0.0, 1.0, "root"), (1.0, 1.0, "root"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "fifth")],
+    # alt: 8th gallop
+    [(0.0, 0.5, "root"), (0.5, 0.5, "root"),
+     (1.0, 0.5, "fifth"), (1.5, 0.5, "fifth"),
+     (2.0, 0.5, "root"), (2.5, 0.5, "root"),
+     (3.0, 0.5, "fifth"), (3.5, 0.5, "fifth")],
+]
+_FOLK_STOMP_P = [
+    # canonical: kick 1+3 / snare 2+4 (Mumford)
+    [(0.0, "kick", 0.78), (1.0, "snare", 0.62),
+     (2.0, "kick", 0.78), (3.0, "snare", 0.62)],
+    # alt: + snare clap echo
+    [(0.0, "kick", 0.78), (1.0, "snare", 0.60), (1.5, "snare", 0.42),
+     (2.0, "kick", 0.75), (3.0, "snare", 0.60), (3.5, "snare", 0.42)],
+]
+
+# jazz_ballad → swing: uptempo classic swing. ride 8ths + walking bass.
+_JAZZ_SWING_H = [
+    # canonical: short stabs on 1, 1.5, 3, 3.5
+    [(0.0, 1.0, "top3", 0.85),
+     (1.5, 0.5, "top",  0.78),
+     (2.0, 1.0, "top3", 0.85),
+     (3.5, 0.5, "top",  0.78)],
+    # alt: walking comping (2+4 stabs)
+    [(1.0, 0.5, "top3", 0.85),
+     (3.0, 0.5, "top3", 0.85)],
+]
+_JAZZ_SWING_B = [
+    # canonical: walking quarters (chord-tone arpeggio)
+    [(0.0, 1.0, "root"), (1.0, 1.0, "third"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "fifth_up")],
+    # alt: chromatic walking (passing tone)
+    [(0.0, 1.0, "root"), (1.0, 1.0, "fifth_up"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "third")],
+]
+_JAZZ_SWING_P = [
+    # canonical: ride 8ths
+    [(0.0, "ride", 0.45), (0.5, "ride", 0.30),
+     (1.0, "ride", 0.45), (1.5, "ride", 0.30),
+     (2.0, "ride", 0.45), (2.5, "ride", 0.30),
+     (3.0, "ride", 0.45), (3.5, "ride", 0.30)],
+    # alt: ride + brush back-beat 2+4
+    [(0.0, "ride", 0.40), (1.0, "brush", 0.55),
+     (2.0, "ride", 0.40), (3.0, "brush", 0.55)],
+]
+
+# ambient → film: orchestral motion + 화성 변화감. 밝고 따뜻한 날.
+_AMB_FILM_H = [
+    # canonical: half-bar all → top motion → top3
+    [(0.0, 2.0, "all",  1.00),
+     (2.0, 1.0, "top",  0.85),
+     (3.0, 1.0, "top3", 0.85)],
+    # alt: arpeggio motion across 8ths → sustained
+    [(0.0, 0.5, "root",  0.85), (0.5, 0.5, "fifth", 0.80),
+     (1.0, 0.5, "top",   0.82), (1.5, 0.5, "top3",  0.85),
+     (2.0, 2.0, "all",   1.00)],
+]
+_AMB_FILM_B = [
+    # canonical: gentle root → fifth motion
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],
+    # alt: walking quarters (gentle)
+    [(0.0, 1.0, "root"), (1.0, 1.0, "third"),
+     (2.0, 1.0, "fifth"), (3.0, 1.0, "root")],
+]
+_AMB_FILM_P = [
+    # canonical: very soft tap 1+3
+    [(0.0, "tap", 0.32), (2.0, "tap", 0.28)],
+    # alt: soft brush 1+3
+    [(0.0, "brush", 0.28), (2.0, "brush", 0.25)],
+]
+
+# neo_classical → romantic: 굴리는 아르페지오 + 7th 다발. Einaudi 톤.
+_NEO_ROMANTIC_H = [
+    # canonical: rolled chord through 8ths (sustain-pedal arpeggio)
+    [(0.0, 0.5, "root",  0.90),
+     (0.5, 0.5, "fifth", 0.85),
+     (1.0, 0.5, "top",   0.85),
+     (1.5, 2.5, "top3",  0.92)],
+    # alt: block + arpeggio tail
+    [(0.0, 2.0, "all", 1.00),
+     (2.0, 0.5, "top",    0.80),
+     (2.5, 0.5, "fifth",  0.78),
+     (3.0, 0.5, "top",    0.85),
+     (3.5, 0.5, "root_5", 0.85)],
+]
+_NEO_ROMANTIC_B = [
+    # canonical: scalar walking 8ths
+    [(0.0, 0.5, "fifth_up"), (0.5, 0.5, "third"),
+     (1.0, 0.5, "root"),     (1.5, 0.5, "fifth"),
+     (2.0, 0.5, "third"),    (2.5, 0.5, "fifth_up"),
+     (3.0, 0.5, "fifth"),    (3.5, 0.5, "root")],
+    # alt: alberti 8ths
+    [(0.0, 0.5, "root"),     (0.5, 0.5, "fifth_up"),
+     (1.0, 0.5, "third"),    (1.5, 0.5, "fifth_up"),
+     (2.0, 0.5, "root"),     (2.5, 0.5, "fifth_up"),
+     (3.0, 0.5, "third"),    (3.5, 0.5, "fifth_up")],
+]
+_NEO_ROMANTIC_P = [
+    # canonical: tap 1+3 + brush ghost between
+    [(0.0, "tap", 0.55), (1.5, "brush", 0.35),
+     (2.0, "tap", 0.50), (3.5, "brush", 0.32)],
+    # alt: tap on every quarter
+    [(0.0, "tap", 0.55), (1.0, "tap", 0.32),
+     (2.0, "tap", 0.50), (3.0, "tap", 0.32)],
+]
+
+# lo_fi → ambient_lofi: 무드럼 패드 헤비. 매우 wet+calm 날.
+_LOFI_AMBIENT_H = [
+    # canonical: full-bar sustain
+    [(0.0, 4.0, "all", 0.95)],
+    # alt: 2-half sustain
+    [(0.0, 2.0, "all", 0.95), (2.0, 2.0, "top", 0.88)],
+]
+_LOFI_AMBIENT_B = [
+    # canonical: root pedal full bar
+    [(0.0, 4.0, "root")],
+    # alt: root + fifth half-bar
+    [(0.0, 2.0, "root"), (2.0, 2.0, "fifth")],
+]
+_LOFI_AMBIENT_P = [
+    [],                                                          # silent
+    [(0.0, "brush", 0.20)],                                      # very soft brush on 1
+]
+
 
 # Registry mapping (layer, genre, sub_style) → cell pack. Lookup is
 # 4/4 only — sub-styles aren't defined for 3/4 / 6/8 yet (those meters
@@ -1334,34 +1512,52 @@ _SUB_PACKS = {
     "harmony": {
         ("bossa_nova",  "basica"):     _BOSSA_BASICA_H,
         ("bossa_nova",  "jazz"):       _BOSSA_JAZZ_H,
+        ("bossa_nova",  "samba"):      _BOSSA_SAMBA_H,
         ("folk",        "boom_chick"): _FOLK_BOOMCHICK_H,
         ("folk",        "celtic"):     _FOLK_CELTIC_H,
+        ("folk",        "stomp"):      _FOLK_STOMP_H,
         ("jazz_ballad", "walking"):    _JAZZ_WALKING_H,
         ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_H,
+        ("jazz_ballad", "swing"):      _JAZZ_SWING_H,
         ("ambient",       "drone"):    _AMB_DRONE_H,
+        ("ambient",       "film"):     _AMB_FILM_H,
         ("neo_classical", "pedal"):    _NEO_PEDAL_H,
+        ("neo_classical", "romantic"): _NEO_ROMANTIC_H,
         ("lo_fi",         "boombap"):  _LOFI_BOOMBAP_H,
+        ("lo_fi",         "ambient_lofi"): _LOFI_AMBIENT_H,
     },
     "bass": {
         ("bossa_nova",  "basica"):     _BOSSA_BASICA_B,
         ("bossa_nova",  "jazz"):       _BOSSA_JAZZ_B,
+        ("bossa_nova",  "samba"):      _BOSSA_SAMBA_B,
         ("folk",        "boom_chick"): _FOLK_BOOMCHICK_B,
         ("folk",        "celtic"):     _FOLK_CELTIC_B,
+        ("folk",        "stomp"):      _FOLK_STOMP_B,
         ("jazz_ballad", "walking"):    _JAZZ_WALKING_B,
         ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_B,
+        ("jazz_ballad", "swing"):      _JAZZ_SWING_B,
         ("ambient",       "drone"):    _AMB_DRONE_B,
+        ("ambient",       "film"):     _AMB_FILM_B,
         ("neo_classical", "pedal"):    _NEO_PEDAL_B,
+        ("neo_classical", "romantic"): _NEO_ROMANTIC_B,
         ("lo_fi",         "boombap"):  _LOFI_BOOMBAP_B,
+        ("lo_fi",         "ambient_lofi"): _LOFI_AMBIENT_B,
     },
     "percussion": {
         ("bossa_nova",  "basica"):     _BOSSA_BASICA_P,
         ("bossa_nova",  "jazz"):       _BOSSA_JAZZ_P,
+        ("bossa_nova",  "samba"):      _BOSSA_SAMBA_P,
         ("folk",        "boom_chick"): _FOLK_BOOMCHICK_P,
         ("folk",        "celtic"):     _FOLK_CELTIC_P,
+        ("folk",        "stomp"):      _FOLK_STOMP_P,
         ("jazz_ballad", "walking"):    _JAZZ_WALKING_P,
         ("jazz_ballad", "rubato"):     _JAZZ_RUBATO_P,
+        ("jazz_ballad", "swing"):      _JAZZ_SWING_P,
         ("ambient",       "drone"):    _AMB_DRONE_P,
+        ("ambient",       "film"):     _AMB_FILM_P,
         ("neo_classical", "pedal"):    _NEO_PEDAL_P,
+        ("neo_classical", "romantic"): _NEO_ROMANTIC_P,
         ("lo_fi",         "boombap"):  _LOFI_BOOMBAP_P,
+        ("lo_fi",         "ambient_lofi"): _LOFI_AMBIENT_P,
     },
 }
