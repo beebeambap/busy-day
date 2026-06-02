@@ -349,6 +349,26 @@ def compose_ir(
                     voicing="seventh", base_octave=3,
                 )
             }
+            # Dynamic floor for the right-hand harmony so it never lands
+            # IN the left-hand chord's register. We compute the bar's
+            # worst-case chord top (ninth voicing with the song's actual
+            # voicing_spread) and float the harmony 2 semitones above it.
+            #
+            # Old static floor MIDI 48 (= chord root @ oct 3) let the
+            # right-hand 3rd-below dive into the chord stack, especially
+            # when:
+            #   - melody is at oct 4 (cold-day macro shift) — harmony
+            #     candidates land at D3-A3, right in the chord cluster
+            #   - wide voicing_spread + ninth → chord top reaches D5,
+            #     and the right-hand harmony 3rd-below the default oct 5
+            #     melody falls below the chord's top
+            # Either case produced muddy doubling in the chord register.
+            harm_floor_chord = chord_pitches(
+                key, mode, chord_root,
+                voicing="ninth", base_octave=3,
+                spread=voicing_spread,
+            )
+            harm_floor = max(harm_floor_chord) + 2
             # Genre-aware harmonization rate. Scales both the always-on
             # first-note path and the probabilistic later-notes path.
             harm_mult = _GENRE_HARMONIZE_MULTIPLIER.get(genre, 1.0)
@@ -403,9 +423,12 @@ def compose_ir(
 
                     if should_harmonize:
                         h_pitch = _harmony_below_chord(pitch, harm_chord_pcs)
-                        # Stay above the bass (MIDI 48 = C3) so the
-                        # texture doesn't muddy.
-                        if h_pitch is not None and 48 <= h_pitch < pitch:
+                        # Stay above the left-hand chord's top (dynamic
+                        # harm_floor computed at bar entry). Drops the
+                        # harmonization rate on low-melody / wide-spread
+                        # bars rather than producing muddy chord-zone
+                        # doublings.
+                        if h_pitch is not None and harm_floor <= h_pitch < pitch:
                             h_vel = max(35, vel - 12)
                             melody_events.append({
                                 "bar": cur_bar,
