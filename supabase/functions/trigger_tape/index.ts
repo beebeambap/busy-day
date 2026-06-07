@@ -22,6 +22,7 @@ const CORS_HEADERS = {
 const TAPE_IDS = new Set([
   "clear_hot",
   "rain",
+  "shower",
   "snow",
   "fog",
   "cold_clear",
