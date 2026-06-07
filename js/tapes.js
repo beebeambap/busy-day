@@ -12,6 +12,7 @@
 export const TAPE_LABELS = {
   clear_hot:  { label: "맑고 더운 날",       icon: "🌞", short: "맑고 더운 날 편곡" },
   rain:       { label: "비 오는 날",        icon: "🌧", short: "비 오는 날 편곡" },
+  shower:     { label: "소나기 오는 날",     icon: "🌦", short: "소나기 편곡" },
   snow:       { label: "눈 오는 날",        icon: "❄",  short: "눈 오는 날 편곡" },
   fog:        { label: "안개 낀 날",        icon: "🌫", short: "안개 낀 날 편곡" },
   cold_clear: { label: "춥고 맑은 날",       icon: "🥶", short: "춥고 맑은 날 편곡" },
@@ -38,25 +39,28 @@ export function matchWeatherTape(weather) {
   // 2) STORM — heavy rain + strong wind.
   if (precip >= 5.0 && wind >= 5.0) return "storm";
 
-  // 3) RAIN — meaningful rain + overcast.
+  // 3) SHOWER — KMA precip_type code 4 (소나기). Short convective rain.
+  if (ptype === "shower") return "shower";
+
+  // 4) RAIN — meaningful rain + overcast.
   if (precip >= 0.3 && cloud >= 50.0) return "rain";
 
-  // 4) FOG — heavy cloud + humid + still air, no precip.
+  // 5) FOG — heavy cloud + humid + still air, no precip.
   if (cloud >= 80.0 && humid >= 75.0 && wind < 3.0 && precip < 0.3) return "fog";
 
-  // 5) CLEAR_HOT — hot + clear + dry.
+  // 6) CLEAR_HOT — hot + clear + dry.
   if (temp >= 25.0 && cloud <= 30.0 && precip <= 0.5) return "clear_hot";
 
-  // 6) COLD_CLEAR — freezing + clear + dry.
+  // 7) COLD_CLEAR — freezing + clear + dry.
   if (temp <= 5.0 && cloud <= 50.0 && precip < 0.3 && humid < 65.0) return "cold_clear";
 
-  // 7) HUMID — muggy summer, no rain.
+  // 8) HUMID — muggy summer, no rain.
   if (humid >= 80.0 && temp >= 22.0 && precip < 0.5) return "humid";
 
-  // 8) WINDY — strong wind, dry.
+  // 9) WINDY — strong wind, dry.
   if (wind >= 5.0 && precip < 1.0) return "windy";
 
-  // 9) COOL_CLEAR — mild clear-sky fallback.
+  // 10) COOL_CLEAR — mild clear-sky fallback.
   if (temp >= 12.0 && temp <= 22.0 && cloud <= 30.0 && precip < 0.3) return "cool_clear";
 
   return null;

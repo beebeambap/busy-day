@@ -247,9 +247,37 @@ COOL_CLEAR = TapePreset(
 )
 
 
+# SHOWER: passing summer rain. Heavier than light rain but short-lived —
+# the "지나가는 소나기 후 햇살" feel. Lighter and more upbeat than RAIN
+# (which is steady all-day overcast). Rhodes EP for café warmth + light
+# swing for the lingering air freshness.
+SHOWER = TapePreset(
+    id="shower",
+    label_ko="소나기 오는 날",
+    genre_override="jazz_ballad",
+    voicing="ninth",
+    # Neutral tempo — keeps the source's energy. (RAIN is -12%, slow;
+    # SHOWER is meant to feel transient, not heavy.)
+    bpm_multiplier=1.00,
+    # Rhodes — warmer/lighter than RAIN's grand piano. Reads as "café
+    # at the moment the shower hits, not after hours of rain".
+    melody_instrument="rhodes",
+    velocity_profile={
+        "melody":  (54, 26),    # brighter than RAIN's (48,26)
+        "harmony": (44, 18),
+        "bass":    (50, 18),
+    },
+    # Lighter swing than RAIN (1.30 vs 1.50) — the air feel is brisker.
+    swing_ratio=1.30,
+    # Smaller behind-beat lag than RAIN (10 vs 18 ms).
+    groove_delay_ms=10.0,
+)
+
+
 PRESETS: dict[str, TapePreset] = {
     "clear_hot":  CLEAR_HOT,
     "rain":       RAIN,
+    "shower":     SHOWER,
     "snow":       SNOW,
     "fog":        FOG,
     "cold_clear": COLD_CLEAR,
@@ -289,35 +317,41 @@ def match_weather(weather: dict | None) -> str | None:
     if ptype in ("snow", "rain_snow"):
         return "snow"
 
-    # 2) STORM — heavy rain + strong wind. Dramatic.
+    # 2) STORM — heavy rain + strong wind. Dramatic. (A shower with
+    # storm-level wind/precip still reads as "storm" here.)
     if precip >= 5.0 and wind >= 5.0:
         return "storm"
 
-    # 3) RAIN — meaningful rain + overcast (existing).
+    # 3) SHOWER — KMA precip_type code 4 (소나기). Convective short-
+    # duration rain, distinct mood from steady all-day rain.
+    if ptype == "shower":
+        return "shower"
+
+    # 4) RAIN — meaningful rain + overcast (existing).
     if precip >= 0.3 and cloud >= 50.0:
         return "rain"
 
-    # 4) FOG — heavy cloud + humid + still air, no precip.
+    # 5) FOG — heavy cloud + humid + still air, no precip.
     if cloud >= 80.0 and humid >= 75.0 and wind < 3.0 and precip < 0.3:
         return "fog"
 
-    # 5) CLEAR_HOT — hot + clear + dry (existing).
+    # 6) CLEAR_HOT — hot + clear + dry (existing).
     if temp >= 25.0 and cloud <= 30.0 and precip <= 0.5:
         return "clear_hot"
 
-    # 6) COLD_CLEAR — freezing + clear + dry.
+    # 7) COLD_CLEAR — freezing + clear + dry.
     if temp <= 5.0 and cloud <= 50.0 and precip < 0.3 and humid < 65.0:
         return "cold_clear"
 
-    # 7) HUMID — muggy summer, no rain.
+    # 8) HUMID — muggy summer, no rain.
     if humid >= 80.0 and temp >= 22.0 and precip < 0.5:
         return "humid"
 
-    # 8) WINDY — strong wind, dry.
+    # 9) WINDY — strong wind, dry.
     if wind >= 5.0 and precip < 1.0:
         return "windy"
 
-    # 9) COOL_CLEAR — fallback clear-sky preset for mild weather.
+    # 10) COOL_CLEAR — fallback clear-sky preset for mild weather.
     if 12.0 <= temp <= 22.0 and cloud <= 30.0 and precip < 0.3:
         return "cool_clear"
 
