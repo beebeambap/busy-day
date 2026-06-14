@@ -322,6 +322,13 @@ def compose_ir(
     last_bar_idx = len(chord_seq) - 1
     cur_bar = 0
     ring_out_beats = 0.0  # extra ring for the closing chord
+    # Per-section voicing override — decided once at section entry and
+    # held for every bar in that section. Replaces the previous per-bar
+    # random voicing churn which produced 14-27% adjacent-bar voicing
+    # changes (felt jarring) and propagated ninth voicing past its
+    # intended section boundaries.
+    section_voicing_override: str | None = None
+    prev_section_for_voicing: str | None = None
     for bar_idx, (chord_root, mel_notes, meta) in enumerate(
         zip(chord_seq, melody_bars, bars_meta)
     ):
@@ -450,27 +457,41 @@ def compose_ir(
         # Final bar always uses the genre default so the closer rings.
         bar_voicing = voicing
         if not is_final:
-            if section == "B" and voicing == "triad":
-                # Bright songs flagged with use_ninth occasionally pick
-                # the airier 9th voicing (root+3+5+7+9) instead of plain
-                # 7th — the "tropical café" color. Suppressed on dim/wet
-                # days where the picker won't be flagged.
-                if use_ninth_in_song and rng.random() < 0.28:
-                    bar_voicing = "ninth"
-                elif rng.random() < 0.42:
-                    bar_voicing = "seventh"
-            # Celtic open-fifth drone: the defining Muji-Celtic sound.
-            # Expanded to all folk meters (was 6/8 only) and added A_PRIME.
-            # 6/8 still has the highest probability (jig feel + drone = classic).
-            celtic_zone = (genre == "folk"
-                           and section in ("INTRO", "A", "A_PRIME", "OUTRO"))
-            if celtic_zone and voicing == "triad":
-                p_open = 0.60 if meter == "6/8" else 0.38
-                if rng.random() < p_open:
-                    bar_voicing = "open_fifth"
-            elif genre == "ambient" and voicing == "triad" \
-                    and section != "B" and rng.random() < 0.32:
-                bar_voicing = "open_fifth"
+            # On section entry: decide the voicing override for THIS
+            # whole section (one roll, not per-bar). Same colour holds
+            # across all bars in the section → cohesive phrase.
+            if section != prev_section_for_voicing:
+                section_voicing_override = None
+                # Ninth voicing puts a chord-tone at root+14 (D4 for a
+                # C-root chord). That sits in two risky zones:
+                #   - cold-day melody at oct 4 (MIDI 60-71) — direct hit
+                #   - wide spread + melody at oct 5 — top gets pushed
+                #     up into the melody (we already prevent the top
+                #     push for ninth in scales.py, but the bare 9th
+                #     itself still occupies the boundary)
+                # Suppress ninth in those configurations.
+                ninth_safe = (melody_octave >= 5
+                              and voicing_spread != "wide")
+                if section == "B" and voicing == "triad":
+                    if (use_ninth_in_song and ninth_safe
+                            and rng.random() < 0.28):
+                        section_voicing_override = "ninth"
+                    elif rng.random() < 0.42:
+                        section_voicing_override = "seventh"
+                celtic_zone = (genre == "folk"
+                               and section in ("INTRO", "A", "A_PRIME", "OUTRO"))
+                if (section_voicing_override is None
+                        and celtic_zone and voicing == "triad"):
+                    p_open = 0.60 if meter == "6/8" else 0.38
+                    if rng.random() < p_open:
+                        section_voicing_override = "open_fifth"
+                elif (section_voicing_override is None
+                      and genre == "ambient" and voicing == "triad"
+                      and section != "B" and rng.random() < 0.32):
+                    section_voicing_override = "open_fifth"
+                prev_section_for_voicing = section
+            if section_voicing_override:
+                bar_voicing = section_voicing_override
 
         full_chord = chord_pitches(key, mode, chord_for_harmony,
                                    voicing=bar_voicing, base_octave=3,
@@ -522,7 +543,12 @@ def compose_ir(
                 # Macro register shift: bright/dry days lift the bass
                 # up an octave for a lighter feel. Wet/dim days stay
                 # at the current deep default (bass_oct_shift = 0).
-                pitch += 12 * bass_oct_shift
+                # Skip the shift for fifth_up — it already sits at oct
+                # 3 (MIDI 48+, INSIDE the chord stack); shifting it up
+                # pushes it through the chord into melody territory and
+                # was producing 37% bass-in-chord-zone on bright days.
+                if kind != "fifth_up":
+                    pitch += 12 * bass_oct_shift
                 if not (24 <= pitch <= 60):
                     continue
                 vel = 58 + int(rng.uniform(-3, 3))
