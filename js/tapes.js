@@ -36,8 +36,10 @@ export function matchWeatherTape(weather) {
   // 1) SNOW — precip_type wins regardless of other conditions.
   if (ptype === "snow" || ptype === "rain_snow") return "snow";
 
-  // 2) STORM — heavy rain + strong wind.
-  if (precip >= 5.0 && wind >= 5.0) return "storm";
+  // 2) STORM — true storms only (heavy rain + strong wind, OR torrential).
+  // Old threshold (precip≥5 AND wind≥5) caught ordinary summer showers
+  // with moderate wind; bumped so only genuine storms route here.
+  if ((precip >= 8.0 && wind >= 6.0) || precip >= 15.0) return "storm";
 
   // 3) SHOWER — KMA precip_type code 4 (소나기). Short convective rain.
   if (ptype === "shower") return "shower";

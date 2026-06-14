@@ -317,9 +317,11 @@ def match_weather(weather: dict | None) -> str | None:
     if ptype in ("snow", "rain_snow"):
         return "snow"
 
-    # 2) STORM — heavy rain + strong wind. Dramatic. (A shower with
-    # storm-level wind/precip still reads as "storm" here.)
-    if precip >= 5.0 and wind >= 5.0:
+    # 2) STORM — only true storms (heavy rain + strong wind, OR torrential
+    # rain alone). Previous threshold (precip≥5 AND wind≥5) caught
+    # ordinary summer showers with moderate wind, mis-routing them as
+    # "폭풍 첼로 발라드" when the listener expected light rain music.
+    if (precip >= 8.0 and wind >= 6.0) or precip >= 15.0:
         return "storm"
 
     # 3) SHOWER — KMA precip_type code 4 (소나기). Convective short-
