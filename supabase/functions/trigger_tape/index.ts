@@ -64,7 +64,15 @@ Deno.serve(async (req: Request) => {
     return j({ error: "invalid source_song_id (expected uuid)" }, 400);
   }
   if (!TAPE_IDS.has(tapeId)) {
-    return j({ error: `invalid tape_id (known: ${[...TAPE_IDS].join(", ")})` }, 400);
+    // Include both the rejected id and the allowlist so the frontend
+    // surface tells the user/dev which side is out of date. Common
+    // case: a new preset was added to compose/tapes/presets.py but
+    // this Edge Function's TAPE_IDS Set wasn't redeployed.
+    return j({
+      error: `invalid tape_id '${tapeId}' — not in server allowlist`,
+      server_allowlist: [...TAPE_IDS],
+      hint: "If this is a newly added preset, redeploy trigger_tape Edge Function with the updated TAPE_IDS Set.",
+    }, 400);
   }
 
   const pat   = Deno.env.get("GITHUB_PAT");
