@@ -24,12 +24,15 @@ def _variant_weights(rng: Random) -> list[float]:
         0.5,                         # omit a note
         0.6,                         # echo (repeat last 2)
         # Octave displacement of the phrase tail. Spreads the melody's
-        # spectral energy across octaves so consecutive motif statements
-        # don't pile identical peaks at the same frequencies (an
-        # anti-fingerprint measure) while reading as a natural melodic
-        # leap. Bounded to the tail so the line stays singable.
-        0.7,                         # octave_lift  (tail +1 oct)
-        0.5,                         # octave_drop  (tail -1 oct)
+        # spectral energy across octaves (anti-fingerprint) while
+        # reading as a natural melodic leap.
+        # Weights cut from original 0.7/0.5:
+        #   - lift to 0.35: tail rising is musical (peak gesture)
+        #   - drop to 0.15: tail diving into chord-zone (oct 3-4) was
+        #     the main source of m2/M2 clashes with the left-hand
+        #     chord stack — cut more aggressively than lift
+        0.35,                        # octave_lift  (tail +1 oct)
+        0.15,                        # octave_drop  (tail -1 oct)
     ]
 
 

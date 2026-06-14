@@ -81,7 +81,15 @@ def chord_pitches(
     if spread == "wide" and len(pitches) >= 2:
         pitches = list(pitches)
         pitches[0]  = pitches[0] - 12
-        pitches[-1] = pitches[-1] + 12
+        # Only TRIAD (and open_fifth) get the top push. For seventh /
+        # ninth the top voice is already a tension note at root+11 or
+        # +14, which sits at B3-D4 (or above with the push) right in
+        # the bottom of the oct-5 melody zone. Pushing it another oct
+        # up was the main cause of m2/M2 clashes ("windy+warm" had 3×
+        # the dissonance of other weather). Root drop alone still
+        # widens the chord substantially (≈ 23 semitones for seventh).
+        if voicing in ("triad", "open_fifth"):
+            pitches[-1] = pitches[-1] + 12
     elif spread == "tight":
         # Already same octave by construction; nothing to do.
         pass
