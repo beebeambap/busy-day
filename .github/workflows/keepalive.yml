@@ -1,0 +1,51 @@
+name: keepalive
+
+# Prevents GitHub from auto-disabling the scheduled daily-compose
+# workflow. GitHub disables a scheduled (cron) workflow after 60 days
+# with NO repository commits — and a scheduled run does NOT count as
+# activity, only commits do. This job commits a timestamp once a month
+# (well inside the 60-day window) so the inactivity timer never trips,
+# regardless of how often humans / Claude sessions push. It also
+# explicitly re-enables daily-compose in case it was already disabled.
+#
+# The commit is made with GITHUB_TOKEN; such commits do not trigger
+# other workflows (no loop), but they DO count as repository activity
+# and reset the 60-day timer for every workflow, including this one.
+
+on:
+  schedule:
+    - cron: "17 3 1 * *"        # 1st of each month, 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write               # to push the timestamp commit
+  actions:  write               # to re-enable disabled workflows
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Touch keepalive timestamp and commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p .github
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/last-keepalive.txt
+          git add .github/last-keepalive.txt
+          if git diff --cached --quiet; then
+            echo "no change to commit"
+          else
+            git commit -m "chore: keepalive $(date -u +%Y-%m-%d) [skip ci]"
+            git push
+          fi
+
+      - name: Re-enable scheduled workflows if disabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Belt-and-suspenders: if daily-compose was auto-disabled,
+          # turn it back on. No-op when it's already active.
+          gh workflow enable daily-compose.yml || true
