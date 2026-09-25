@@ -34,6 +34,36 @@ _MAX_RETRIES = 4
 _BACKOFF_BASE = 2.0   # seconds: 2, 4, 8, 16
 
 
+def seasonal_default(date_iso: str) -> dict:
+    """A plausible Seoul weather aggregate derived from the month only.
+
+    Last-resort fallback when the KMA API is unreachable (all retries
+    exhausted — e.g. the 2026-08-13 cron failed on repeated
+    ConnectTimeout). Producing a season-appropriate song beats failing
+    the whole daily run and leaving a gap in the calendar. The values
+    are monthly Seoul climate normals, rounded to feed features.extract
+    sensibly. precip_type is 'none' (a default day is a calm one)."""
+    month = int(date_iso.split("-")[1])
+    # (temp_c, humidity, cloud_pct, temp_range) per month — Seoul normals
+    table = {
+        1:  (-2, 55, 45, 9),  2:  (1,  55, 45, 10), 3:  (7,  58, 50, 11),
+        4:  (14, 58, 50, 12), 5:  (19, 62, 50, 11), 6:  (23, 70, 60, 9),
+        7:  (26, 80, 70, 7),  8:  (27, 78, 65, 8),  9:  (22, 70, 55, 9),
+        10: (15, 62, 45, 11), 11: (8,  60, 50, 10), 12: (0,  56, 45, 9),
+    }
+    temp_c, humidity, cloud, trange = table.get(month, (15, 60, 50, 8))
+    return {
+        "temp_c":      float(temp_c),
+        "temp_range":  float(trange),
+        "humidity":    float(humidity),
+        "precip_mm":   0.0,
+        "wind_mps":    2.0,
+        "cloud_pct":   float(cloud),
+        "precip_type": "none",
+        "_fallback":   "seasonal_default",   # marker for logs/debugging
+    }
+
+
 def _get_with_retry(url: str, params: dict, timeout: float) -> requests.Response:
     """GET with exponential backoff on transient errors (429 / 5xx /
     connection failures). Honors a Retry-After header when present.

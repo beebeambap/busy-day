@@ -112,7 +112,17 @@ def cmd_daily(args: argparse.Namespace) -> int:
         with open(args.weather, encoding="utf-8") as fh:
             weather = json.load(fh)
     else:
-        weather = fetch_daily(nx=nx, ny=ny, date_iso=date_iso)
+        # KMA's public endpoint is occasionally unreachable (repeated
+        # ConnectTimeout) or rate-limited past our retries. Rather than
+        # fail the whole daily run and leave a calendar gap, fall back to
+        # a season-appropriate default so a song still gets generated.
+        try:
+            weather = fetch_daily(nx=nx, ny=ny, date_iso=date_iso)
+        except Exception as exc:
+            from .kma import seasonal_default
+            weather = seasonal_default(date_iso)
+            print(f"[busy-day daily] KMA fetch failed ({type(exc).__name__}: "
+                  f"{exc}); using seasonal_default weather for {date_iso}")
 
     # 2. anti-repetition memory
     memory = _recent_signatures(sb, city, date_iso)
